@@ -69,5 +69,58 @@ pub fn gemm_AT<T: Scalar>(a: T, A: MatRef<'_, T>, B: MatRef<'_, T>, b: T, mut C:
         return;
     }
 
-    todo!()
+    for k in 0..B.shape().rows() {
+        let rB = B.row(k);
+        let rA = A.row(k);
+        for i in 0..A.shape().cols() {
+            let cols = C.shape().cols();
+            let rC = C.row_mut(i);
+            for j in 0..cols {
+                let x = rA.get(i).unwrap();
+                *rC.get_mut(j).unwrap() += a * *rA.get(i).unwrap() * *rB.get(j).unwrap();
+            }
+        }
+    }
+
+    A.into_row_iterator()
+        .zip(B.into_row_iterator())
+        .for_each(|(rA, rB)| {
+            // i: element A[k][i] wybiera wiersz i macierzy C
+            rA.iter().zip(C.row_iterator_mut()).for_each(|(&eA, rC)| {
+                let x = a * eA;
+                // j: C[i][j] += x * B[k][j], obie strony ciągłe w pamięci
+                rB.iter()
+                    .zip(rC.iter_mut())
+                    .for_each(|(&eB, eC)| *eC += x * eB);
+            });
+        });
+}
+
+pub fn gemm_BT<T: Scalar>(a: T, A: MatRef<'_, T>, B: MatRef<'_, T>, b: T, mut C: MatRefMut<'_, T>) {
+    debug_assert!(
+        A.shape().cols() == B.shape().cols()
+            && A.shape().rows() == C.shape().rows()
+            && B.shape().rows() == C.shape().cols(),
+        "A B C have wrong shapes"
+    );
+
+    C.scale_by(b);
+
+    if a == T::ZERO {
+        return;
+    }
+
+    A.into_row_iterator()
+        .zip(C.into_row_iterator_mut())
+        .for_each(|(rA, rC)| {
+            rC.iter_mut()
+                .zip(B.into_row_iterator())
+                .for_each(|(c, rB)| {
+                    let mut acc = rA
+                        .iter()
+                        .zip(rB.iter())
+                        .fold(T::ZERO, |s, (&x, &y)| s + x * y);
+                    *c += a * acc;
+                });
+        });
 }
