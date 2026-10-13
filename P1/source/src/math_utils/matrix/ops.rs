@@ -1,6 +1,6 @@
-use crate::math_utils::Scalar;
-use crate::math_utils::matrix::layout::{Layout, Shape};
+use crate::math_utils::matrix::layout::Shape;
 use crate::math_utils::matrix::{Mat, MatRef, MatRefMut};
+use crate::math_utils::{Real, Scalar};
 
 impl<T: Scalar> Mat<T> {
     pub fn scale_by(&mut self, a: T) {
@@ -8,11 +8,152 @@ impl<T: Scalar> Mat<T> {
     }
 
     pub fn fill(&mut self, a: T) {
-        self.data.fill(a);
+        self.to_ref_mut().fill(a);
+    }
+
+    pub fn add_to_every_row(&mut self, row_vec: MatRef<'_, T>) {
+        self.to_ref_mut().add_to_every_row(row_vec);
+    }
+
+    pub fn sum_of_rows(&self, alpha: T, out: MatRefMut<'_, T>) {
+        self.to_ref().sum_of_rows(alpha, out);
+    }
+
+    pub fn map<F>(&self, f: F, out: MatRefMut<'_, T>)
+    where
+        F: Fn(T) -> T + Sync,
+    {
+        self.to_ref().map(f, out);
+    }
+
+    pub fn map_in_place<F>(&mut self, f: F)
+    where
+        F: Fn(T) -> T + Sync,
+    {
+        self.to_ref_mut().map_in_place(f);
+    }
+
+    pub fn zip_map<F>(&self, other: MatRef<'_, T>, f: F, out: MatRefMut<'_, T>)
+    where
+        F: Fn(T, T) -> T + Sync,
+    {
+        self.to_ref().zip_map(other, f, out);
+    }
+
+    pub fn zip_map_in_place<F>(&mut self, other: MatRef<'_, T>, f: F)
+    where
+        F: Fn(T, T) -> T + Sync,
+    {
+        self.to_ref_mut().zip_map_in_place(other, f);
+    }
+
+    pub fn zip2_map_in_place<F>(&mut self, other1: MatRef<'_, T>, other2: MatRef<'_, T>, f: F)
+    where
+        F: Fn(T, T, T) -> T + Sync,
+    {
+        self.to_ref_mut().zip2_map_in_place(other1, other2, f);
+    }
+
+    pub fn fold<A, F>(&self, init: A, f: F) -> A
+    where
+        F: Fn(A, T) -> A,
+    {
+        self.to_ref().fold(init, f)
+    }
+
+    pub fn sum(&self) -> T {
+        self.to_ref().sum()
+    }
+
+    pub fn zip_fold<A, F>(&self, other: MatRef<'_, T>, init: A, f: F) -> A
+    where
+        F: Fn(A, T, T) -> A,
+    {
+        self.to_ref().zip_fold(other, init, f)
+    }
+
+    pub fn dot(&self, other: MatRef<'_, T>) -> T {
+        self.to_ref().dot(other)
     }
 }
 
-impl<'a, T: Scalar> MatRef<'a, T> {}
+impl<'a, T: Scalar> MatRef<'a, T> {
+    pub fn sum_of_rows(&self, alpha: T, mut out: MatRefMut<'_, T>) {
+        debug_assert!(self.shape().cols() == out.shape().cols() && out.shape().rows() == 1);
+        let acc = out.row_mut(0);
+        acc.fill(T::ZERO);
+        self.row_iterator().for_each(|r| {
+            acc.iter_mut().zip(r.iter()).for_each(|(ac, &e)| *ac += e);
+        });
+        if alpha != T::ONE {
+            out.scale_by(alpha);
+        }
+    }
+
+    pub fn map<F>(&self, f: F, mut out: MatRefMut<'_, T>)
+    where
+        F: Fn(T) -> T + Sync,
+    {
+        debug_assert!(self.shape() == out.shape());
+        self.row_iterator()
+            .zip(out.row_iterator_mut())
+            .for_each(|(rs, ro)| {
+                rs.iter().zip(ro.iter_mut()).for_each(|(&s, o)| *o = f(s));
+            });
+    }
+
+    pub fn zip_map<F>(&self, other: MatRef<'_, T>, f: F, mut out: MatRefMut<'_, T>)
+    where
+        F: Fn(T, T) -> T + Sync,
+    {
+        debug_assert!(self.shape() == other.shape() && self.shape() == out.shape());
+        self.row_iterator()
+            .zip(other.row_iterator())
+            .zip(out.row_iterator_mut())
+            .for_each(|((rs, ro), rr)| {
+                rs.iter()
+                    .zip(ro.iter())
+                    .zip(rr.iter_mut())
+                    .for_each(|((&s, &o), r)| *r = f(s, o));
+            });
+    }
+
+    pub fn fold<A, F>(&self, init: A, f: F) -> A
+    where
+        F: Fn(A, T) -> A,
+    {
+        self.row_iterator()
+            .fold(init, |acc, r| r.iter().fold(acc, |acc, &e| f(acc, e)))
+    }
+
+    pub fn sum(&self) -> T {
+        self.fold(T::ZERO, |x, y| x + y)
+    }
+
+    pub fn zip_fold<A, F>(&self, other: MatRef<'_, T>, init: A, f: F) -> A
+    where
+        F: Fn(A, T, T) -> A,
+    {
+        debug_assert!(self.shape() == other.shape());
+        self.row_iterator()
+            .zip(other.row_iterator())
+            .fold(init, |acc, (rs, ro)| {
+                rs.iter()
+                    .zip(ro.iter())
+                    .fold(acc, |acc, (&es, &eo)| f(acc, es, eo))
+            })
+    }
+
+    pub fn dot(&self, other: MatRef<'_, T>) -> T {
+        self.zip_fold(other, T::ZERO, |a, x, y| a + x * y)
+    }
+}
+
+impl<'a, T: Real> MatRef<'a, T> {
+    pub fn norm(&self) -> T {
+        self.dot(*self).sqrt()
+    }
+}
 
 impl<'a, T: Scalar> MatRefMut<'a, T> {
     pub fn scale_by(&mut self, a: T) {
@@ -25,102 +166,191 @@ impl<'a, T: Scalar> MatRefMut<'a, T> {
     }
 
     pub fn fill(&mut self, a: T) {
-        self.data.fill(a);
+        self.row_iterator_mut().for_each(|r| r.fill(a));
+    }
+
+    pub fn add_to_every_row(&mut self, row_vec: MatRef<'_, T>) {
+        debug_assert!(row_vec.shape() == Shape::new(1, self.shape().cols()));
+        let row = row_vec.row(0);
+        self.row_iterator_mut()
+            .for_each(|r| r.iter_mut().zip(row.iter()).for_each(|(s, &o)| *s += o));
+    }
+
+    pub fn sum_of_rows(&self, alpha: T, out: MatRefMut<'_, T>) {
+        self.reborrow().sum_of_rows(alpha, out);
+    }
+
+    pub fn map<F>(&self, f: F, out: MatRefMut<'_, T>)
+    where
+        F: Fn(T) -> T + Sync,
+    {
+        self.reborrow().map(f, out);
+    }
+
+    pub fn map_in_place<F>(&mut self, f: F)
+    where
+        F: Fn(T) -> T + Sync,
+    {
+        self.row_iterator_mut()
+            .for_each(|r| r.iter_mut().for_each(|x| *x = f(*x)));
+    }
+
+    pub fn zip_map<F>(&self, other: MatRef<'_, T>, f: F, out: MatRefMut<'_, T>)
+    where
+        F: Fn(T, T) -> T + Sync,
+    {
+        self.reborrow().zip_map(other, f, out);
+    }
+
+    pub fn zip_map_in_place<F>(&mut self, other: MatRef<'_, T>, f: F)
+    where
+        F: Fn(T, T) -> T + Sync,
+    {
+        debug_assert!(self.shape() == other.shape());
+        self.row_iterator_mut()
+            .zip(other.row_iterator())
+            .for_each(|(rs, ro)| {
+                rs.iter_mut()
+                    .zip(ro.iter())
+                    .for_each(|(s, &o)| *s = f(*s, o));
+            });
+    }
+
+    pub fn zip2_map_in_place<F>(&mut self, other1: MatRef<'_, T>, other2: MatRef<'_, T>, f: F)
+    where
+        F: Fn(T, T, T) -> T + Sync,
+    {
+        debug_assert!(self.shape() == other1.shape() && self.shape() == other2.shape());
+        self.row_iterator_mut()
+            .zip(other1.row_iterator())
+            .zip(other2.row_iterator())
+            .for_each(|((rs, ro1), ro2)| {
+                rs.iter_mut()
+                    .zip(ro1.iter())
+                    .zip(ro2.iter())
+                    .for_each(|((s, &o1), &o2)| *s = f(*s, o1, o2));
+            });
+    }
+
+    pub fn fold<A, F>(&self, init: A, f: F) -> A
+    where
+        F: Fn(A, T) -> A,
+    {
+        self.reborrow().fold(init, f)
+    }
+
+    pub fn sum(&self) -> T {
+        self.reborrow().sum()
+    }
+
+    pub fn zip_fold<A, F>(&self, other: MatRef<'_, T>, init: A, f: F) -> A
+    where
+        F: Fn(A, T, T) -> A,
+    {
+        self.reborrow().zip_fold(other, init, f)
+    }
+
+    pub fn dot(&self, other: MatRef<'_, T>) -> T {
+        self.reborrow().dot(other)
     }
 }
 
-pub fn gemm<T: Scalar>(a: T, A: MatRef<'_, T>, B: MatRef<'_, T>, b: T, mut C: MatRefMut<'_, T>) {
+pub fn gemm<T: Scalar>(
+    alpha: T,
+    a: MatRef<'_, T>,
+    b: MatRef<'_, T>,
+    beta: T,
+    mut c: MatRefMut<'_, T>,
+) {
     debug_assert!(
-        A.shape().cols() == B.shape().rows()
-            && A.shape().rows() == C.shape().rows()
-            && B.shape().cols() == C.shape().cols(),
-        "A B C have wrong shapes"
+        a.shape().cols() == b.shape().rows()
+            && a.shape().rows() == c.shape().rows()
+            && b.shape().cols() == c.shape().cols()
     );
 
-    C.scale_by(b);
+    c.scale_by(beta);
 
-    if a == T::ZERO {
+    if alpha == T::ZERO {
         return;
     }
 
-    A.into_row_iterator()
-        .zip(C.row_iterator_mut())
-        .for_each(|(rA, rC)| {
-            B.into_row_iterator().zip(rA.iter()).for_each(|(rB, &eA)| {
-                let x = a * eA;
-                rB.iter()
-                    .zip(rC.iter_mut())
-                    .for_each(|(&eB, eC)| *eC += x * eB);
-            });
+    a.into_row_iterator()
+        .zip(c.row_iterator_mut())
+        .for_each(|(r_a, r_c)| {
+            b.into_row_iterator()
+                .zip(r_a.iter())
+                .for_each(|(r_b, &e_a)| {
+                    let x = alpha * e_a;
+                    r_b.iter()
+                        .zip(r_c.iter_mut())
+                        .for_each(|(&e_b, e_c)| *e_c += x * e_b);
+                });
         });
 }
 
-pub fn gemm_AT<T: Scalar>(a: T, A: MatRef<'_, T>, B: MatRef<'_, T>, b: T, mut C: MatRefMut<'_, T>) {
+pub fn gemm_at<T: Scalar>(
+    alpha: T,
+    a: MatRef<'_, T>,
+    b: MatRef<'_, T>,
+    beta: T,
+    mut c: MatRefMut<'_, T>,
+) {
     debug_assert!(
-        A.shape().rows() == B.shape().rows()
-            && A.shape().cols() == C.shape().rows()
-            && B.shape().cols() == C.shape().cols(),
-        "A B C have wrong shapes"
+        a.shape().rows() == b.shape().rows()
+            && a.shape().cols() == c.shape().rows()
+            && b.shape().cols() == c.shape().cols()
     );
 
-    C.scale_by(b);
+    c.scale_by(beta);
 
-    if a == T::ZERO {
+    if alpha == T::ZERO {
         return;
     }
 
-    for k in 0..B.shape().rows() {
-        let rB = B.row(k);
-        let rA = A.row(k);
-        for i in 0..A.shape().cols() {
-            let cols = C.shape().cols();
-            let rC = C.row_mut(i);
-            for j in 0..cols {
-                let x = rA.get(i).unwrap();
-                *rC.get_mut(j).unwrap() += a * *rA.get(i).unwrap() * *rB.get(j).unwrap();
-            }
-        }
-    }
-
-    A.into_row_iterator()
-        .zip(B.into_row_iterator())
-        .for_each(|(rA, rB)| {
-            // i: element A[k][i] wybiera wiersz i macierzy C
-            rA.iter().zip(C.row_iterator_mut()).for_each(|(&eA, rC)| {
-                let x = a * eA;
-                // j: C[i][j] += x * B[k][j], obie strony ciągłe w pamięci
-                rB.iter()
-                    .zip(rC.iter_mut())
-                    .for_each(|(&eB, eC)| *eC += x * eB);
-            });
+    a.into_row_iterator()
+        .zip(b.into_row_iterator())
+        .for_each(|(r_a, r_b)| {
+            r_a.iter()
+                .zip(c.row_iterator_mut())
+                .for_each(|(&e_a, r_c)| {
+                    let x = alpha * e_a;
+                    r_b.iter()
+                        .zip(r_c.iter_mut())
+                        .for_each(|(&e_b, e_c)| *e_c += x * e_b);
+                });
         });
 }
 
-pub fn gemm_BT<T: Scalar>(a: T, A: MatRef<'_, T>, B: MatRef<'_, T>, b: T, mut C: MatRefMut<'_, T>) {
+pub fn gemm_bt<T: Scalar>(
+    alpha: T,
+    a: MatRef<'_, T>,
+    b: MatRef<'_, T>,
+    beta: T,
+    mut c: MatRefMut<'_, T>,
+) {
     debug_assert!(
-        A.shape().cols() == B.shape().cols()
-            && A.shape().rows() == C.shape().rows()
-            && B.shape().rows() == C.shape().cols(),
-        "A B C have wrong shapes"
+        a.shape().cols() == b.shape().cols()
+            && a.shape().rows() == c.shape().rows()
+            && b.shape().rows() == c.shape().cols()
     );
 
-    C.scale_by(b);
+    c.scale_by(beta);
 
-    if a == T::ZERO {
+    if alpha == T::ZERO {
         return;
     }
 
-    A.into_row_iterator()
-        .zip(C.into_row_iterator_mut())
-        .for_each(|(rA, rC)| {
-            rC.iter_mut()
-                .zip(B.into_row_iterator())
-                .for_each(|(c, rB)| {
-                    let mut acc = rA
+    a.into_row_iterator()
+        .zip(c.into_row_iterator_mut())
+        .for_each(|(r_a, r_c)| {
+            r_c.iter_mut()
+                .zip(b.into_row_iterator())
+                .for_each(|(e_c, r_b)| {
+                    let acc = r_a
                         .iter()
-                        .zip(rB.iter())
+                        .zip(r_b.iter())
                         .fold(T::ZERO, |s, (&x, &y)| s + x * y);
-                    *c += a * acc;
+                    *e_c += alpha * acc;
                 });
         });
 }

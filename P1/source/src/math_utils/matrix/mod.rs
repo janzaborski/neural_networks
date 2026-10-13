@@ -187,6 +187,22 @@ impl<'a, T> MatRefMut<'a, T> {
     }
 }
 
+impl<'a, T: Copy> MatRef<'a, T> {
+    pub fn copy_into(&self, mut dest: MatRefMut<'_, T>) {
+        debug_assert!(self.shape() == dest.shape());
+
+        let n = self.shape().logical_count();
+        if let (Some(s), Some(d)) = (self.as_contiguous_slice(), dest.as_contiguous_slice_mut()) {
+            d[..n].copy_from_slice(&s[..n]);
+            return;
+        }
+
+        self.row_iterator()
+            .zip(dest.row_iterator_mut())
+            .for_each(|(s, d)| d.copy_from_slice(s));
+    }
+}
+
 impl<T: Scalar> Mat<T> {
     pub fn zeros(shape: Shape) -> Self {
         Self::from_vec(vec![T::ZERO; shape.logical_count()], shape)

@@ -21,10 +21,21 @@ pub trait Scalar:
     const ZERO: Self;
     const ONE: Self;
     fn from_f64(x: f64) -> Self;
+    fn to_f64(self) -> f64;
     fn max(self, other: Self) -> Self;
     fn min(self, other: Self) -> Self;
     fn abs(self) -> Self;
     fn is_finite(self) -> bool;
+
+    fn sign(self) -> Self {
+        if self > Self::ZERO {
+            Self::ONE
+        } else if self < Self::ZERO {
+            -Self::ONE
+        } else {
+            Self::ZERO
+        }
+    }
 }
 
 pub trait Real: Scalar {
