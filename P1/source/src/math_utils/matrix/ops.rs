@@ -153,6 +153,33 @@ impl<'a, T: Real> MatRef<'a, T> {
     pub fn norm(&self) -> T {
         self.dot(*self).sqrt()
     }
+
+    pub fn get_means_stdevs(&self) -> (Vec<T>, Vec<T>) {
+        let mut means = vec![T::ZERO; self.shape().cols()];
+
+        self.row_iterator()
+            .for_each(|r| r.iter().zip(means.iter_mut()).for_each(|(&x, s)| *s += x));
+        let n_rows = self.shape().rows();
+        let n_rows = T::from_f64(n_rows as f64);
+        means.iter_mut().for_each(|x| *x = *x / n_rows);
+
+        let mut stds = vec![T::ZERO; self.shape().cols()];
+        self.row_iterator().for_each(|r| {
+            r.iter()
+                .zip(means.iter())
+                .zip(stds.iter_mut())
+                .for_each(|((&x, &s), st)| *st += (x - s) * (x - s))
+        });
+        stds.iter_mut().for_each(|st| *st = T::sqrt(*st / n_rows));
+
+        stds.iter_mut().for_each(|s| {
+            if *s < T::from_f64(1e-12) {
+                *s = T::ONE
+            }
+        });
+
+        (means, stds)
+    }
 }
 
 impl<'a, T: Scalar> MatRefMut<'a, T> {
@@ -252,6 +279,33 @@ impl<'a, T: Scalar> MatRefMut<'a, T> {
 
     pub fn dot(&self, other: MatRef<'_, T>) -> T {
         self.reborrow().dot(other)
+    }
+
+    pub fn apply_normalization(&mut self, means: &[T], stdevs: &[T]) {
+        debug_assert!(means.len() == self.shape().cols() && stdevs.len() == means.len());
+        self.row_iterator_mut().for_each(|r| {
+            r.iter_mut()
+                .zip(means.iter())
+                .zip(stdevs.iter())
+                .for_each(|((x, &m), &s)| *x = (*x - m) / s)
+        });
+    }
+
+    pub fn invert_normalization(&mut self, means: &[T], stds: &[T]) {
+        self.row_iterator_mut().for_each(|r| {
+            r.iter_mut()
+                .zip(means.iter())
+                .zip(stds.iter())
+                .for_each(|((x, &m), &s)| *x = *x * s + m)
+        });
+    }
+}
+
+impl<'a, T: Real> MatRefMut<'a, T> {
+    pub fn normalize(&mut self) -> (Vec<T>, Vec<T>) {
+        let (means, stdevs) = self.reborrow().get_means_stdevs();
+        self.apply_normalization(&means, &stdevs);
+        (means, stdevs)
     }
 }
 
