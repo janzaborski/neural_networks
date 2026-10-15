@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::data::{DataSpec, TaskKind};
 use crate::math_utils::matrix::{MatRef, MatRefMut};
 use crate::math_utils::{Real, Scalar};
 use crate::neural_network::activation::{self as act, Activation, ElementWise};
@@ -20,7 +21,7 @@ pub struct Config {
     #[serde(default)]
     pub dtype: Dtype,
     pub seeds: Vec<u64>,
-    pub data: DataConfig,
+    pub data: DataSpec,
     pub net: NetConfig,
     pub train: TrainSettings,
     #[serde(default)]
@@ -33,21 +34,6 @@ pub enum Dtype {
     F32,
     #[default]
     F64,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum TaskKind {
-    Regression,
-    Classification,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct DataConfig {
-    pub task: TaskKind,
-    pub train: PathBuf,
-    pub test: PathBuf,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,14 +59,14 @@ pub struct TrainSettings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct OutputConfig {
-    pub log_weights: bool,
+    pub weights_every: usize,
     pub grid_steps: usize,
 }
 
 impl Default for OutputConfig {
     fn default() -> Self {
         Self {
-            log_weights: false,
+            weights_every: 0,
             grid_steps: 200,
         }
     }
@@ -193,6 +179,12 @@ impl Config {
         self.out_dir.join(&self.name)
     }
 
+    pub fn resolve(&mut self) -> Result<(), String> {
+        self.data
+            .resolve()
+            .map_err(|e| format!("config {:?}: {e}", self.name))
+    }
+
     pub fn validate(&self) -> Result<(), String> {
         let mut errs = Vec::new();
 
@@ -232,6 +224,23 @@ impl Config {
         }
         if self.train.log_every == 0 {
             errs.push("log_every must be > 0".to_string());
+        }
+        if self.train.log_every > 0
+            && !self
+                .output
+                .weights_every
+                .is_multiple_of(self.train.log_every)
+        {
+            errs.push(format!(
+                "weights_every ({}) must be 0 or a multiple of log_every ({})",
+                self.output.weights_every, self.train.log_every
+            ));
+        }
+        if !(0.0..1.0).contains(&self.data.validation) {
+            errs.push(format!(
+                "validation must be in [0, 1), got {}",
+                self.data.validation
+            ));
         }
         if self.output.grid_steps < 2 {
             errs.push("grid_steps must be >= 2".to_string());

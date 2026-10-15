@@ -7,15 +7,14 @@ use std::process::ExitCode;
 use std::time::Instant;
 
 use rand::SeedableRng;
+use rand::seq::SliceRandom;
 use rand_chacha::ChaCha8Rng;
 use rayon::prelude::*;
 use serde::Serialize;
 use serde_json::{Value, json};
 
-use neural_net::config::{
-    Config, DataConfig, Dtype, HeadKind, HiddenKind, TaskKind, load_configs, validate_all,
-};
-use neural_net::data::{Dataset, Normalization, Task};
+use neural_net::config::{Config, Dtype, HeadKind, HiddenKind, load_configs, validate_all};
+use neural_net::data::{DataSpec, Dataset, Normalization, Task, TaskKind};
 use neural_net::eval::{self, History, WeightLog};
 use neural_net::math_utils::Real;
 use neural_net::neural_network::NeuralNetwork;
@@ -25,13 +24,27 @@ type Res<T> = Result<T, Box<dyn Error + Send + Sync>>;
 type Net<T> = NeuralNetwork<T, HiddenKind, HeadKind>;
 
 struct Prepared<T> {
-    raw_train: Dataset<T>,
+    raw_train: Option<Dataset<T>>,
     train: Dataset<T>,
+    val: Option<Dataset<T>>,
     test: Dataset<T>,
     norm: Normalization<T>,
 }
 
-type Cache<T> = HashMap<DataConfig, Prepared<T>>;
+impl<T> Prepared<T> {
+    fn splits(&self) -> Vec<(&'static str, &Dataset<T>)> {
+        let mut s = vec![("train", &self.train)];
+        if let Some(v) = &self.val {
+            s.push(("val", v));
+        }
+        s.push(("test", &self.test));
+        s
+    }
+}
+
+type Cache<T> = HashMap<String, Prepared<T>>;
+
+const PLOT_MAX_INPUTS: usize = 2;
 
 fn usage() -> String {
     "usage: nn [--overwrite] <config.json>...\n  each file holds one config object or an array of them".to_string()
@@ -69,6 +82,13 @@ fn run() -> Res<usize> {
     let mut configs = Vec::new();
     for f in &files {
         configs.extend(load_configs(f)?);
+    }
+    let resolve_errors: Vec<String> = configs
+        .iter_mut()
+        .filter_map(|c| c.resolve().err())
+        .collect();
+    if !resolve_errors.is_empty() {
+        return Err(resolve_errors.join("\n").into());
     }
     validate_all(&configs)?;
 
@@ -120,11 +140,12 @@ fn run() -> Res<usize> {
 fn load_cache<T: Real>(configs: &[&Config]) -> Res<Cache<T>> {
     let mut cache = Cache::new();
     for c in configs {
-        if !cache.contains_key(&c.data) {
+        let key = c.data.key();
+        if !cache.contains_key(&key) {
             let p = prepare::<T>(&c.data)?;
-            cache.insert(c.data.clone(), p);
+            cache.insert(key.clone(), p);
         }
-        let d = &cache[&c.data];
+        let d = &cache[&key];
         if c.train.batch > d.train.len() {
             return Err(format!(
                 "config {:?}: batch {} > {} training samples",
@@ -138,39 +159,56 @@ fn load_cache<T: Real>(configs: &[&Config]) -> Res<Cache<T>> {
     Ok(cache)
 }
 
-fn prepare<T: Real>(d: &DataConfig) -> Res<Prepared<T>> {
-    let load = |path: &Path, k: Option<usize>| -> Res<Dataset<T>> {
-        let r = match d.task {
-            TaskKind::Regression => Dataset::load_regression(path),
-            TaskKind::Classification => Dataset::load_classification(path, k),
-        };
-        r.map_err(|e| format!("{}: {e}", path.display()).into())
-    };
-
-    let raw_train = load(&d.train, None)?;
-    let k = match raw_train.task() {
+fn prepare<T: Real>(d: &DataSpec) -> Res<Prepared<T>> {
+    let full = Dataset::<T>::load(d, &d.train, None)?;
+    let k = match full.task() {
         Task::Classification { n_classes } => Some(n_classes),
         Task::Regression => None,
     };
-    let mut train = load(&d.train, k)?;
-    let mut test = load(&d.test, k)?;
+    let mut test = Dataset::<T>::load(d, &d.test, k)?;
 
-    if train.x().shape().cols() != test.x().shape().cols() {
+    if full.x().shape().cols() != test.x().shape().cols()
+        || full.y().shape().cols() != test.y().shape().cols()
+    {
         return Err(format!(
-            "{} has {} input column(s), {} has {}",
-            d.train.display(),
-            train.x().shape().cols(),
-            d.test.display(),
-            test.x().shape().cols()
+            "train {:?} has shape x {:?} y {:?}, test {:?} has x {:?} y {:?}",
+            d.train,
+            full.x().shape(),
+            full.y().shape(),
+            d.test,
+            test.x().shape(),
+            test.y().shape()
         )
         .into());
     }
 
-    let norm = train.fit_normalization();
+    let (mut train, mut val) = if d.validation > 0.0 {
+        let n = full.len();
+        let n_val = (n as f64 * d.validation).round() as usize;
+        if n_val == 0 || n_val >= n {
+            return Err(format!(
+                "validation = {} leaves {n_val} of {n} samples for validation",
+                d.validation
+            )
+            .into());
+        }
+        let mut idx: Vec<usize> = (0..n).collect();
+        idx.shuffle(&mut ChaCha8Rng::seed_from_u64(d.split_seed));
+        (full.select(&idx[n_val..]), Some(full.select(&idx[..n_val])))
+    } else {
+        (full, None)
+    };
+
+    let raw_train = (train.x().shape().cols() <= PLOT_MAX_INPUTS).then(|| train.duplicate());
+    let norm = train.fit_normalization(d.normalize);
     test.apply_normalization(&norm);
+    if let Some(v) = val.as_mut() {
+        v.apply_normalization(&norm);
+    }
     Ok(Prepared {
         raw_train,
         train,
+        val,
         test,
         norm,
     })
@@ -178,7 +216,9 @@ fn prepare<T: Real>(d: &DataConfig) -> Res<Prepared<T>> {
 
 fn write_points<T: Real>(configs: &[&Config], cache: &Cache<T>) -> Res<()> {
     for c in configs {
-        eval::write_points(c.dir().join("points_train.csv"), &cache[&c.data].raw_train)?;
+        if let Some(raw) = &cache[&c.data.key()].raw_train {
+            eval::write_points(c.dir().join("points_train.csv"), raw)?;
+        }
     }
     Ok(())
 }
@@ -191,11 +231,25 @@ fn run_jobs<T: Real>(configs: &[&Config], cache: &Cache<T>) -> Vec<String> {
 
     jobs.par_iter()
         .filter_map(|&(c, seed)| {
-            run_seed(c, &cache[&c.data], seed)
+            run_seed(c, &cache[&c.data.key()], seed)
                 .err()
                 .map(|e| format!("[{} seed={seed}] {e}", c.name))
         })
         .collect()
+}
+
+fn final_metrics<T: Real>(net: &Net<T>, data: &Dataset<T>, norm: &Normalization<T>) -> Value {
+    let (pred, cost) = eval::predict_with_cost(net, data);
+    match data.task() {
+        Task::Regression => {
+            let m = eval::regression_metrics_of(pred, data, norm);
+            json!({ "cost": cost, "mse": m.mse, "mae": m.mae })
+        }
+        Task::Classification { .. } => {
+            let m = eval::classification_metrics_of(pred.to_ref(), data);
+            json!({ "cost": cost, "accuracy": m.accuracy, "macro_f1": m.macro_f1, "confusion": m.confusion })
+        }
+    }
 }
 
 fn run_seed<T: Real>(c: &Config, d: &Prepared<T>, seed: u64) -> Res<()> {
@@ -211,22 +265,33 @@ fn run_seed<T: Real>(c: &Config, d: &Prepared<T>, seed: u64) -> Res<()> {
     let mut net: Net<T> =
         NeuralNetwork::new(&sizes, c.net.bias, c.net.activation, c.net.head, &mut rng);
     let cfg = c.train.to_train_config::<T>();
+    let splits = d.splits();
+    let weights_every = c.output.weights_every;
 
     let mut history = History::default();
-    let mut weights = match c.output.log_weights {
-        true => Some(WeightLog::create(dir.join("weights.csv"))?),
-        false => None,
+    let mut weights = match weights_every {
+        0 => None,
+        _ => Some(WeightLog::create(&dir, &net)?),
     };
 
-    let (tr, te) = (&d.train, &d.test);
-    let outcome = train(&mut net, tr, &cfg, &mut rng, |epoch, net| {
-        let c_tr = eval::cost(net, tr);
-        let c_te = eval::cost(net, te);
-        history.push(epoch, c_tr, c_te);
-        if !c_tr.is_finite() {
-            return Err(format!("diverged at epoch {epoch} (train cost {c_tr})"));
+    let outcome = train(&mut net, &d.train, &cfg, &mut rng, |epoch, net| {
+        let mut row = vec![("epoch".to_string(), epoch as f64)];
+        for (name, data) in &splits {
+            for (metric, v) in eval::evaluate(net, data, &d.norm) {
+                row.push((format!("{name}_{metric}"), v));
+            }
         }
-        if let Some(w) = weights.as_mut() {
+        let train_cost = row[1].1;
+        history.push(row);
+        if !train_cost.is_finite() {
+            return Err(format!(
+                "diverged at epoch {epoch} (train cost {train_cost})"
+            ));
+        }
+        if let Some(w) = weights
+            .as_mut()
+            .filter(|_| epoch % weights_every == 0 || epoch == cfg.epochs)
+        {
             w.record(epoch, net).map_err(|e| e.to_string())?;
         }
         Ok(())
@@ -235,7 +300,7 @@ fn run_seed<T: Real>(c: &Config, d: &Prepared<T>, seed: u64) -> Res<()> {
     if let Some(w) = weights.as_mut() {
         w.flush()?;
     }
-    history.write_csv(dir.join("loss.csv"))?;
+    history.write_csv(dir.join("history.csv"))?;
     let seconds = start.elapsed().as_secs_f64();
 
     if let Err(e) = outcome {
@@ -246,52 +311,40 @@ fn run_seed<T: Real>(c: &Config, d: &Prepared<T>, seed: u64) -> Res<()> {
         return Err(e.into());
     }
 
-    let (m_train, m_test, summary) = match c.data.task {
+    let mut metrics = json!({ "seed": seed, "seconds": seconds, "epochs": cfg.epochs });
+    for (name, data) in &splits {
+        metrics[*name] = final_metrics(&net, data, &d.norm);
+    }
+    write_json(dir.join("metrics.json"), &metrics)?;
+
+    let summary = match c.data.task {
         TaskKind::Regression => {
-            let m_tr = eval::regression_metrics(&net, tr, &d.norm);
-            let m_te = eval::regression_metrics(&net, te, &d.norm);
-            if tr.x().shape().cols() == 1 {
-                eval::write_regression(dir.join("pred.csv"), &net, te, &d.norm)?;
+            if d.train.x().shape().cols() == 1 {
+                eval::write_regression(dir.join("pred.csv"), &net, &d.test, &d.norm)?;
             }
-            (
-                json!({ "mse": m_tr.mse, "mae": m_tr.mae }),
-                json!({ "mse": m_te.mse, "mae": m_te.mae }),
-                format!("test MSE {:.4} MAE {:.4}", m_te.mse, m_te.mae),
+            format!(
+                "test MSE {:.4} MAE {:.4}",
+                metrics["test"]["mse"].as_f64().unwrap_or(f64::NAN),
+                metrics["test"]["mae"].as_f64().unwrap_or(f64::NAN)
             )
         }
         TaskKind::Classification => {
-            let m_tr = eval::classification_metrics(&net, tr);
-            let m_te = eval::classification_metrics(&net, te);
-            if tr.x().shape().cols() == 2 {
+            if let Some(raw) = d.raw_train.as_ref().filter(|r| r.x().shape().cols() == 2) {
                 eval::write_decision_grid(
                     dir.join("grid.csv"),
                     &net,
-                    &d.raw_train,
+                    raw,
                     &d.norm,
                     c.output.grid_steps,
                 )?;
             }
-            (
-                json!({ "accuracy": m_tr.accuracy, "macro_f1": m_tr.macro_f1, "confusion": m_tr.confusion }),
-                json!({ "accuracy": m_te.accuracy, "macro_f1": m_te.macro_f1, "confusion": m_te.confusion }),
-                format!("test acc {:.4} F1 {:.4}", m_te.accuracy, m_te.macro_f1),
+            format!(
+                "test acc {:.4} F1 {:.4}",
+                metrics["test"]["accuracy"].as_f64().unwrap_or(f64::NAN),
+                metrics["test"]["macro_f1"].as_f64().unwrap_or(f64::NAN)
             )
         }
     };
-
-    let with_cost = |mut m: Value, cost: Option<&f64>| {
-        m["cost"] = json!(cost);
-        m
-    };
-    write_json(
-        dir.join("metrics.json"),
-        &json!({
-            "seed": seed,
-            "seconds": seconds,
-            "train": with_cost(m_train, history.train.last()),
-            "test": with_cost(m_test, history.test.last()),
-        }),
-    )?;
 
     println!("[{} seed={seed}] {summary} ({seconds:.1}s)", c.name);
     Ok(())
