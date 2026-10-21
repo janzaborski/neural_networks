@@ -61,6 +61,7 @@ pub struct TrainSettings {
 pub struct OutputConfig {
     pub weights_every: usize,
     pub grid_steps: usize,
+    pub log_deltas: bool,
 }
 
 impl Default for OutputConfig {
@@ -68,6 +69,7 @@ impl Default for OutputConfig {
         Self {
             weights_every: 0,
             grid_steps: 200,
+            log_deltas: false,
         }
     }
 }
@@ -241,6 +243,9 @@ impl Config {
                 "validation must be in [0, 1), got {}",
                 self.data.validation
             ));
+        }
+        if self.data.test.is_none() && self.data.validation == 0.0 {
+            errs.push("provide test data or a nonzero validation fraction".to_string());
         }
         if self.output.grid_steps < 2 {
             errs.push("grid_steps must be >= 2".to_string());

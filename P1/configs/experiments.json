@@ -1,0 +1,1332 @@
+[
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "classification",
+      "train": "data/projekt1/classification/data.simple.train.1000.csv",
+      "test": "data/projekt1/classification/data.simple.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [],
+      "activation": "tanh",
+      "head": "softmax_cross_entropy",
+      "bias": true
+    },
+    "train": {
+      "epochs": 260,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "simple_linear_tanh_softmax_cross_entropy"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "classification",
+      "train": "data/projekt1/classification/data.simple.train.1000.csv",
+      "test": "data/projekt1/classification/data.simple.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        8
+      ],
+      "activation": "tanh",
+      "head": "softmax_cross_entropy",
+      "bias": true
+    },
+    "train": {
+      "epochs": 260,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "simple_8_tanh_softmax_cross_entropy"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "classification",
+      "train": "data/projekt1/classification/data.simple.train.1000.csv",
+      "test": "data/projekt1/classification/data.simple.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32
+      ],
+      "activation": "tanh",
+      "head": "softmax_cross_entropy",
+      "bias": true
+    },
+    "train": {
+      "epochs": 260,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "simple_32_tanh_softmax_cross_entropy"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "classification",
+      "train": "data/projekt1/classification/data.simple.train.1000.csv",
+      "test": "data/projekt1/classification/data.simple.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32,
+        32
+      ],
+      "activation": "tanh",
+      "head": "softmax_cross_entropy",
+      "bias": true
+    },
+    "train": {
+      "epochs": 260,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 1
+    },
+    "output": {
+      "weights_every": 1,
+      "grid_steps": 100,
+      "log_deltas": true
+    },
+    "name": "simple_32-32_tanh_softmax_cross_entropy"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "classification",
+      "train": "data/projekt1/classification/data.simple.train.1000.csv",
+      "test": "data/projekt1/classification/data.simple.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32,
+        32,
+        32
+      ],
+      "activation": "tanh",
+      "head": "softmax_cross_entropy",
+      "bias": true
+    },
+    "train": {
+      "epochs": 260,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "simple_32-32-32_tanh_softmax_cross_entropy"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "classification",
+      "train": "data/projekt1/classification/data.simple.train.1000.csv",
+      "test": "data/projekt1/classification/data.simple.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32,
+        32,
+        32,
+        32
+      ],
+      "activation": "tanh",
+      "head": "softmax_cross_entropy",
+      "bias": true
+    },
+    "train": {
+      "epochs": 260,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "simple_32-32-32-32_tanh_softmax_cross_entropy"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "classification",
+      "train": "data/projekt1/classification/data.simple.train.1000.csv",
+      "test": "data/projekt1/classification/data.simple.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32,
+        32
+      ],
+      "activation": "sigmoid",
+      "head": "softmax_cross_entropy",
+      "bias": true
+    },
+    "train": {
+      "epochs": 260,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "simple_32-32_sigmoid_softmax_cross_entropy"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "classification",
+      "train": "data/projekt1/classification/data.simple.train.1000.csv",
+      "test": "data/projekt1/classification/data.simple.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32,
+        32
+      ],
+      "activation": "relu",
+      "head": "softmax_cross_entropy",
+      "bias": true
+    },
+    "train": {
+      "epochs": 260,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "simple_32-32_relu_softmax_cross_entropy"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "classification",
+      "train": "data/projekt1/classification/data.simple.train.1000.csv",
+      "test": "data/projekt1/classification/data.simple.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32,
+        32
+      ],
+      "activation": "tanh",
+      "head": "softmax_mse",
+      "bias": true
+    },
+    "train": {
+      "epochs": 260,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "simple_32-32_tanh_softmax_mse"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "classification",
+      "train": "data/projekt1/classification/data.three_gauss.train.1000.csv",
+      "test": "data/projekt1/classification/data.three_gauss.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [],
+      "activation": "tanh",
+      "head": "softmax_cross_entropy",
+      "bias": true
+    },
+    "train": {
+      "epochs": 340,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "three_gauss_linear_tanh_softmax_cross_entropy"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "classification",
+      "train": "data/projekt1/classification/data.three_gauss.train.1000.csv",
+      "test": "data/projekt1/classification/data.three_gauss.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        8
+      ],
+      "activation": "tanh",
+      "head": "softmax_cross_entropy",
+      "bias": true
+    },
+    "train": {
+      "epochs": 340,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "three_gauss_8_tanh_softmax_cross_entropy"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "classification",
+      "train": "data/projekt1/classification/data.three_gauss.train.1000.csv",
+      "test": "data/projekt1/classification/data.three_gauss.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32
+      ],
+      "activation": "tanh",
+      "head": "softmax_cross_entropy",
+      "bias": true
+    },
+    "train": {
+      "epochs": 340,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "three_gauss_32_tanh_softmax_cross_entropy"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "classification",
+      "train": "data/projekt1/classification/data.three_gauss.train.1000.csv",
+      "test": "data/projekt1/classification/data.three_gauss.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32,
+        32
+      ],
+      "activation": "tanh",
+      "head": "softmax_cross_entropy",
+      "bias": true
+    },
+    "train": {
+      "epochs": 340,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 1
+    },
+    "output": {
+      "weights_every": 1,
+      "grid_steps": 100,
+      "log_deltas": true
+    },
+    "name": "three_gauss_32-32_tanh_softmax_cross_entropy"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "classification",
+      "train": "data/projekt1/classification/data.three_gauss.train.1000.csv",
+      "test": "data/projekt1/classification/data.three_gauss.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32,
+        32,
+        32
+      ],
+      "activation": "tanh",
+      "head": "softmax_cross_entropy",
+      "bias": true
+    },
+    "train": {
+      "epochs": 340,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "three_gauss_32-32-32_tanh_softmax_cross_entropy"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "classification",
+      "train": "data/projekt1/classification/data.three_gauss.train.1000.csv",
+      "test": "data/projekt1/classification/data.three_gauss.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32,
+        32,
+        32,
+        32
+      ],
+      "activation": "tanh",
+      "head": "softmax_cross_entropy",
+      "bias": true
+    },
+    "train": {
+      "epochs": 340,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "three_gauss_32-32-32-32_tanh_softmax_cross_entropy"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "classification",
+      "train": "data/projekt1/classification/data.three_gauss.train.1000.csv",
+      "test": "data/projekt1/classification/data.three_gauss.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32,
+        32
+      ],
+      "activation": "sigmoid",
+      "head": "softmax_cross_entropy",
+      "bias": true
+    },
+    "train": {
+      "epochs": 340,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "three_gauss_32-32_sigmoid_softmax_cross_entropy"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "classification",
+      "train": "data/projekt1/classification/data.three_gauss.train.1000.csv",
+      "test": "data/projekt1/classification/data.three_gauss.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32,
+        32
+      ],
+      "activation": "relu",
+      "head": "softmax_cross_entropy",
+      "bias": true
+    },
+    "train": {
+      "epochs": 340,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "three_gauss_32-32_relu_softmax_cross_entropy"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "classification",
+      "train": "data/projekt1/classification/data.three_gauss.train.1000.csv",
+      "test": "data/projekt1/classification/data.three_gauss.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32,
+        32
+      ],
+      "activation": "tanh",
+      "head": "softmax_mse",
+      "bias": true
+    },
+    "train": {
+      "epochs": 340,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "three_gauss_32-32_tanh_softmax_mse"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "regression",
+      "train": "data/projekt1/regression/data.cube.train.1000.csv",
+      "test": "data/projekt1/regression/data.cube.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [],
+      "activation": "tanh",
+      "head": "identity_mse",
+      "bias": true
+    },
+    "train": {
+      "epochs": 1000,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "cube_linear_tanh_identity_mse"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "regression",
+      "train": "data/projekt1/regression/data.cube.train.1000.csv",
+      "test": "data/projekt1/regression/data.cube.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        8
+      ],
+      "activation": "tanh",
+      "head": "identity_mse",
+      "bias": true
+    },
+    "train": {
+      "epochs": 1000,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "cube_8_tanh_identity_mse"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "regression",
+      "train": "data/projekt1/regression/data.cube.train.1000.csv",
+      "test": "data/projekt1/regression/data.cube.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32
+      ],
+      "activation": "tanh",
+      "head": "identity_mse",
+      "bias": true
+    },
+    "train": {
+      "epochs": 1000,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "cube_32_tanh_identity_mse"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "regression",
+      "train": "data/projekt1/regression/data.cube.train.1000.csv",
+      "test": "data/projekt1/regression/data.cube.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32,
+        32
+      ],
+      "activation": "tanh",
+      "head": "identity_mse",
+      "bias": true
+    },
+    "train": {
+      "epochs": 1000,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 1
+    },
+    "output": {
+      "weights_every": 1,
+      "grid_steps": 100,
+      "log_deltas": true
+    },
+    "name": "cube_32-32_tanh_identity_mse"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "regression",
+      "train": "data/projekt1/regression/data.cube.train.1000.csv",
+      "test": "data/projekt1/regression/data.cube.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32,
+        32,
+        32
+      ],
+      "activation": "tanh",
+      "head": "identity_mse",
+      "bias": true
+    },
+    "train": {
+      "epochs": 1000,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "cube_32-32-32_tanh_identity_mse"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "regression",
+      "train": "data/projekt1/regression/data.cube.train.1000.csv",
+      "test": "data/projekt1/regression/data.cube.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32,
+        32,
+        32,
+        32
+      ],
+      "activation": "tanh",
+      "head": "identity_mse",
+      "bias": true
+    },
+    "train": {
+      "epochs": 1000,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "cube_32-32-32-32_tanh_identity_mse"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "regression",
+      "train": "data/projekt1/regression/data.cube.train.1000.csv",
+      "test": "data/projekt1/regression/data.cube.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32,
+        32
+      ],
+      "activation": "sigmoid",
+      "head": "identity_mse",
+      "bias": true
+    },
+    "train": {
+      "epochs": 1000,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "cube_32-32_sigmoid_identity_mse"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "regression",
+      "train": "data/projekt1/regression/data.cube.train.1000.csv",
+      "test": "data/projekt1/regression/data.cube.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32,
+        32
+      ],
+      "activation": "relu",
+      "head": "identity_mse",
+      "bias": true
+    },
+    "train": {
+      "epochs": 1000,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "cube_32-32_relu_identity_mse"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "regression",
+      "train": "data/projekt1/regression/data.cube.train.1000.csv",
+      "test": "data/projekt1/regression/data.cube.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32,
+        32
+      ],
+      "activation": "tanh",
+      "head": "identity_mae",
+      "bias": true
+    },
+    "train": {
+      "epochs": 1000,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "cube_32-32_tanh_identity_mae"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "regression",
+      "train": "data/projekt1/regression/data.activation.train.1000.csv",
+      "test": "data/projekt1/regression/data.activation.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [],
+      "activation": "tanh",
+      "head": "identity_mse",
+      "bias": true
+    },
+    "train": {
+      "epochs": 1000,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "activation_linear_tanh_identity_mse"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "regression",
+      "train": "data/projekt1/regression/data.activation.train.1000.csv",
+      "test": "data/projekt1/regression/data.activation.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        8
+      ],
+      "activation": "tanh",
+      "head": "identity_mse",
+      "bias": true
+    },
+    "train": {
+      "epochs": 1000,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "activation_8_tanh_identity_mse"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "regression",
+      "train": "data/projekt1/regression/data.activation.train.1000.csv",
+      "test": "data/projekt1/regression/data.activation.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32
+      ],
+      "activation": "tanh",
+      "head": "identity_mse",
+      "bias": true
+    },
+    "train": {
+      "epochs": 1000,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "activation_32_tanh_identity_mse"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "regression",
+      "train": "data/projekt1/regression/data.activation.train.1000.csv",
+      "test": "data/projekt1/regression/data.activation.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32,
+        32
+      ],
+      "activation": "tanh",
+      "head": "identity_mse",
+      "bias": true
+    },
+    "train": {
+      "epochs": 1000,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 1
+    },
+    "output": {
+      "weights_every": 1,
+      "grid_steps": 100,
+      "log_deltas": true
+    },
+    "name": "activation_32-32_tanh_identity_mse"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "regression",
+      "train": "data/projekt1/regression/data.activation.train.1000.csv",
+      "test": "data/projekt1/regression/data.activation.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32,
+        32,
+        32
+      ],
+      "activation": "tanh",
+      "head": "identity_mse",
+      "bias": true
+    },
+    "train": {
+      "epochs": 1000,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "activation_32-32-32_tanh_identity_mse"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "regression",
+      "train": "data/projekt1/regression/data.activation.train.1000.csv",
+      "test": "data/projekt1/regression/data.activation.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32,
+        32,
+        32,
+        32
+      ],
+      "activation": "tanh",
+      "head": "identity_mse",
+      "bias": true
+    },
+    "train": {
+      "epochs": 1000,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "activation_32-32-32-32_tanh_identity_mse"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "regression",
+      "train": "data/projekt1/regression/data.activation.train.1000.csv",
+      "test": "data/projekt1/regression/data.activation.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32,
+        32
+      ],
+      "activation": "sigmoid",
+      "head": "identity_mse",
+      "bias": true
+    },
+    "train": {
+      "epochs": 1000,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "activation_32-32_sigmoid_identity_mse"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "regression",
+      "train": "data/projekt1/regression/data.activation.train.1000.csv",
+      "test": "data/projekt1/regression/data.activation.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32,
+        32
+      ],
+      "activation": "relu",
+      "head": "identity_mse",
+      "bias": true
+    },
+    "train": {
+      "epochs": 1000,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "activation_32-32_relu_identity_mse"
+  },
+  {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "out_dir": "out/study",
+    "data": {
+      "task": "regression",
+      "train": "data/projekt1/regression/data.activation.train.1000.csv",
+      "test": "data/projekt1/regression/data.activation.test.1000.csv",
+      "normalize": "per_column",
+      "validation": 0.2,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        32,
+        32
+      ],
+      "activation": "tanh",
+      "head": "identity_mae",
+      "bias": true
+    },
+    "train": {
+      "epochs": 1000,
+      "batch": 32,
+      "lr": 0.1,
+      "log_every": 10
+    },
+    "output": {
+      "weights_every": 0,
+      "grid_steps": 100
+    },
+    "name": "activation_32-32_tanh_identity_mae"
+  },
+  {
+    "name": "mnist",
+    "out_dir": "out/study",
+    "seeds": [
+      0,
+      1
+    ],
+    "dtype": "f32",
+    "data": {
+      "task": "classification",
+      "train": {
+        "x": "data/train-images.idx3-ubyte",
+        "y": "data/train-labels.idx1-ubyte"
+      },
+      "test": {
+        "x": "data/t10k-images.idx3-ubyte",
+        "y": "data/t10k-labels.idx1-ubyte"
+      },
+      "normalize": "min_max",
+      "validation": 0,
+      "split_seed": 42
+    },
+    "net": {
+      "hidden": [
+        128,
+        64
+      ],
+      "activation": "relu",
+      "head": "softmax_cross_entropy",
+      "bias": true
+    },
+    "train": {
+      "epochs": 26,
+      "batch": 128,
+      "lr": 0.1,
+      "log_every": 1
+    }
+  }
+]
