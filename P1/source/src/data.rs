@@ -64,7 +64,8 @@ pub enum LabelColumn {
 pub struct DataSpec {
     pub task: TaskKind,
     pub train: Source,
-    pub test: Source,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub test: Option<Source>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub format: Option<FileFormat>,
     #[serde(default)]
@@ -133,7 +134,12 @@ impl DataSpec {
     }
 
     pub fn resolve(&mut self) -> Result<(), String> {
-        for p in self.train.paths().into_iter().chain(self.test.paths()) {
+        for p in self
+            .train
+            .paths()
+            .into_iter()
+            .chain(self.test.iter().flat_map(Source::paths))
+        {
             self.format_of(p)?;
         }
         if self.first_label.is_none() && self.task == TaskKind::Classification {
@@ -533,7 +539,7 @@ mod tests {
     fn spec(task: TaskKind, train: Source, normalize: Normalize) -> DataSpec {
         let mut s = DataSpec {
             task,
-            test: train.clone(),
+            test: Some(train.clone()),
             train,
             format: None,
             normalize,

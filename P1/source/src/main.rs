@@ -27,7 +27,7 @@ struct Prepared<T> {
     raw_train: Option<Dataset<T>>,
     train: Dataset<T>,
     val: Option<Dataset<T>>,
-    test: Dataset<T>,
+    test: Option<Dataset<T>>,
     norm: Normalization<T>,
 }
 
@@ -37,7 +37,6 @@ impl<T> Prepared<T> {
         if let Some(v) = &self.val {
             s.push(("val", v));
         }
-        s.push(("test", &self.test));
         s
     }
 }
@@ -165,21 +164,18 @@ fn prepare<T: Real>(d: &DataSpec) -> Res<Prepared<T>> {
         Task::Classification { n_classes } => Some(n_classes),
         Task::Regression => None,
     };
-    let mut test = Dataset::<T>::load(d, &d.test, k)?;
+    let mut test = d
+        .test
+        .as_ref()
+        .map(|s| Dataset::<T>::load(d, s, k))
+        .transpose()?;
 
-    if full.x().shape().cols() != test.x().shape().cols()
-        || full.y().shape().cols() != test.y().shape().cols()
-    {
-        return Err(format!(
-            "train {:?} has shape x {:?} y {:?}, test {:?} has x {:?} y {:?}",
-            d.train,
-            full.x().shape(),
-            full.y().shape(),
-            d.test,
-            test.x().shape(),
-            test.y().shape()
-        )
-        .into());
+    if let Some(test) = &test {
+        if full.x().shape().cols() != test.x().shape().cols()
+            || full.y().shape().cols() != test.y().shape().cols()
+        {
+            return Err("train and test input/output dimensions differ".into());
+        }
     }
 
     let (mut train, mut val) = if d.validation > 0.0 {
@@ -201,7 +197,9 @@ fn prepare<T: Real>(d: &DataSpec) -> Res<Prepared<T>> {
 
     let raw_train = (train.x().shape().cols() <= PLOT_MAX_INPUTS).then(|| train.duplicate());
     let norm = train.fit_normalization(d.normalize);
-    test.apply_normalization(&norm);
+    if let Some(test) = &mut test {
+        test.apply_normalization(&norm);
+    }
     if let Some(v) = val.as_mut() {
         v.apply_normalization(&norm);
     }
@@ -273,6 +271,17 @@ fn run_seed<T: Real>(c: &Config, d: &Prepared<T>, seed: u64) -> Res<()> {
         0 => None,
         _ => Some(WeightLog::create(&dir, &net)?),
     };
+    // Observe the same training example each epoch, without SGD or RNG calls.
+    let mut delta_probe = c.output.log_deltas.then(|| {
+        (
+            net.workspace(1),
+            net.zero_grads(),
+            net.layers()
+                .iter()
+                .map(|_| History::default())
+                .collect::<Vec<_>>(),
+        )
+    });
 
     let outcome = train(&mut net, &d.train, &cfg, &mut rng, |epoch, net| {
         let mut row = vec![("epoch".to_string(), epoch as f64)];
@@ -294,6 +303,19 @@ fn run_seed<T: Real>(c: &Config, d: &Prepared<T>, seed: u64) -> Res<()> {
         {
             w.record(epoch, net).map_err(|e| e.to_string())?;
         }
+        if let Some((ws, grads, histories)) = delta_probe.as_mut() {
+            let x = d.train.x().subrows(0..1);
+            let y = d.train.y().subrows(0..1);
+            net.forward(x, ws);
+            net.backward(x, y, ws, grads);
+            for (layer, history) in histories.iter_mut().enumerate() {
+                let mut row = vec![("epoch".to_string(), epoch as f64)];
+                for (neuron, delta) in ws.delta(layer).row(0).iter().enumerate() {
+                    row.push((format!("delta_{neuron}"), delta.to_f64()));
+                }
+                history.push(row);
+            }
+        }
         Ok(())
     });
 
@@ -301,6 +323,11 @@ fn run_seed<T: Real>(c: &Config, d: &Prepared<T>, seed: u64) -> Res<()> {
         w.flush()?;
     }
     history.write_csv(dir.join("history.csv"))?;
+    if let Some((_, _, histories)) = delta_probe {
+        for (layer, history) in histories.iter().enumerate() {
+            history.write_csv(dir.join(format!("deltas_layer{layer}.csv")))?;
+        }
+    }
     let seconds = start.elapsed().as_secs_f64();
 
     if let Err(e) = outcome {
@@ -315,17 +342,20 @@ fn run_seed<T: Real>(c: &Config, d: &Prepared<T>, seed: u64) -> Res<()> {
     for (name, data) in &splits {
         metrics[*name] = final_metrics(&net, data, &d.norm);
     }
-    write_json(dir.join("metrics.json"), &metrics)?;
+    if let Some(test) = &d.test {
+        metrics["test"] = final_metrics(&net, test, &d.norm);
+    }
+    let evaluated = if d.test.is_some() { "test" } else { "val" };
 
     let summary = match c.data.task {
         TaskKind::Regression => {
-            if d.train.x().shape().cols() == 1 {
-                eval::write_regression(dir.join("pred.csv"), &net, &d.test, &d.norm)?;
+            if let Some(test) = d.test.as_ref().filter(|_| d.train.x().shape().cols() == 1) {
+                eval::write_regression(dir.join("pred.csv"), &net, test, &d.norm)?;
             }
             format!(
-                "test MSE {:.4} MAE {:.4}",
-                metrics["test"]["mse"].as_f64().unwrap_or(f64::NAN),
-                metrics["test"]["mae"].as_f64().unwrap_or(f64::NAN)
+                "{evaluated} MSE {:.4} MAE {:.4}",
+                metrics[evaluated]["mse"].as_f64().unwrap_or(f64::NAN),
+                metrics[evaluated]["mae"].as_f64().unwrap_or(f64::NAN)
             )
         }
         TaskKind::Classification => {
@@ -339,13 +369,15 @@ fn run_seed<T: Real>(c: &Config, d: &Prepared<T>, seed: u64) -> Res<()> {
                 )?;
             }
             format!(
-                "test acc {:.4} F1 {:.4}",
-                metrics["test"]["accuracy"].as_f64().unwrap_or(f64::NAN),
-                metrics["test"]["macro_f1"].as_f64().unwrap_or(f64::NAN)
+                "{evaluated} acc {:.4} F1 {:.4}",
+                metrics[evaluated]["accuracy"].as_f64().unwrap_or(f64::NAN),
+                metrics[evaluated]["macro_f1"].as_f64().unwrap_or(f64::NAN)
             )
         }
     };
 
+    // Written last: its presence means predictions and weight logs also finished.
+    write_json(dir.join("metrics.json"), &metrics)?;
     println!("[{} seed={seed}] {summary} ({seconds:.1}s)", c.name);
     Ok(())
 }

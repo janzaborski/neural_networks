@@ -470,7 +470,7 @@ mod tests {
         let spec = DataSpec {
             task: TaskKind::Classification,
             train: Source::File(p.clone()),
-            test: Source::File(p.clone()),
+            test: Some(Source::File(p.clone())),
             format: None,
             normalize: Normalize::None,
             first_label: Some(1),

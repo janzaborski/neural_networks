@@ -31,3 +31,12 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# Local environment, previous workflow, and raw experiment outputs
+/.venv/
+/.cache/
+/results/
+/smoke_results/
+/archive/
+/out/study/
+__pycache__/

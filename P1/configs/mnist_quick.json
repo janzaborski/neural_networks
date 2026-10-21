@@ -1,0 +1,29 @@
+{
+  "name": "mnist_quick",
+  "seeds": [67],
+  "dtype": "f32",
+  "data": {
+    "task": "classification",
+    "train": {
+      "x": "data/train-images.idx3-ubyte",
+      "y": "data/train-labels.idx1-ubyte"
+    },
+    "test": {
+      "x": "data/t10k-images.idx3-ubyte",
+      "y": "data/t10k-labels.idx1-ubyte"
+    },
+    "normalize": "min_max",
+    "validation": 0.1
+  },
+  "net": {
+    "hidden": [64],
+    "activation": "relu",
+    "head": "softmax_cross_entropy"
+  },
+  "train": {
+    "epochs": 50,
+    "batch": 64,
+    "lr": 0.1,
+    "log_every": 10
+  }
+}
