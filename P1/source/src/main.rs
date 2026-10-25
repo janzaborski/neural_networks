@@ -28,15 +28,20 @@ struct Prepared<T> {
     train: Dataset<T>,
     val: Option<Dataset<T>>,
     test: Option<Dataset<T>>,
+    evals: Vec<(String, Dataset<T>)>,
     norm: Normalization<T>,
 }
 
 impl<T> Prepared<T> {
-    fn splits(&self) -> Vec<(&'static str, &Dataset<T>)> {
+    fn splits(&self) -> Vec<(&str, &Dataset<T>)> {
         let mut s = vec![("train", &self.train)];
         if let Some(v) = &self.val {
             s.push(("val", v));
         }
+        if let Some(t) = &self.test {
+            s.push(("test", t));
+        }
+        s.extend(self.evals.iter().map(|(name, d)| (name.as_str(), d)));
         s
     }
 }
@@ -170,11 +175,21 @@ fn prepare<T: Real>(d: &DataSpec) -> Res<Prepared<T>> {
         .map(|s| Dataset::<T>::load(d, s, k))
         .transpose()?;
 
-    if let Some(test) = &test {
-        if full.x().shape().cols() != test.x().shape().cols()
-            || full.y().shape().cols() != test.y().shape().cols()
+    let mut evals = d
+        .eval
+        .iter()
+        .map(|(name, s)| Ok((name.clone(), Dataset::<T>::load(d, s, k)?)))
+        .collect::<Res<Vec<_>>>()?;
+
+    for (name, other) in test
+        .iter()
+        .map(|t| ("test", t))
+        .chain(evals.iter().map(|(n, e)| (n.as_str(), e)))
+    {
+        if full.x().shape().cols() != other.x().shape().cols()
+            || full.y().shape().cols() != other.y().shape().cols()
         {
-            return Err("train and test input/output dimensions differ".into());
+            return Err(format!("train and {name} input/output dimensions differ").into());
         }
     }
 
@@ -203,11 +218,15 @@ fn prepare<T: Real>(d: &DataSpec) -> Res<Prepared<T>> {
     if let Some(v) = val.as_mut() {
         v.apply_normalization(&norm);
     }
+    for (_, e) in &mut evals {
+        e.apply_normalization(&norm);
+    }
     Ok(Prepared {
         raw_train,
         train,
         val,
         test,
+        evals,
         norm,
     })
 }
@@ -342,9 +361,6 @@ fn run_seed<T: Real>(c: &Config, d: &Prepared<T>, seed: u64) -> Res<()> {
     for (name, data) in &splits {
         metrics[*name] = final_metrics(&net, data, &d.norm);
     }
-    if let Some(test) = &d.test {
-        metrics["test"] = final_metrics(&net, test, &d.norm);
-    }
     let evaluated = if d.test.is_some() { "test" } else { "val" };
 
     let summary = match c.data.task {
@@ -359,6 +375,13 @@ fn run_seed<T: Real>(c: &Config, d: &Prepared<T>, seed: u64) -> Res<()> {
             )
         }
         TaskKind::Classification => {
+            if let Some(test) = d
+                .test
+                .as_ref()
+                .filter(|t| t.x().shape().cols() <= PLOT_MAX_INPUTS)
+            {
+                eval::write_classification(dir.join("pred.csv"), &net, test, &d.norm)?;
+            }
             if let Some(raw) = d.raw_train.as_ref().filter(|r| r.x().shape().cols() == 2) {
                 eval::write_decision_grid(
                     dir.join("grid.csv"),

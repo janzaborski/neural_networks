@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -243,6 +244,16 @@ impl Config {
                 "validation must be in [0, 1), got {}",
                 self.data.validation
             ));
+        }
+        for name in self.data.eval.keys() {
+            let valid = !name.is_empty()
+                && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+                && !["train", "val", "test"].contains(&name.as_str());
+            if !valid {
+                errs.push(format!(
+                    "invalid eval set name {name:?} (letters, digits, '_'; not train/val/test)"
+                ));
+            }
         }
         if self.data.test.is_none() && self.data.validation == 0.0 {
             errs.push("provide test data or a nonzero validation fraction".to_string());

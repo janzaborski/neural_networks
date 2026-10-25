@@ -26,6 +26,7 @@ pub trait Scalar:
     fn min(self, other: Self) -> Self;
     fn abs(self) -> Self;
     fn is_finite(self) -> bool;
+    fn mul_add(self, a: Self, b: Self) -> Self;
 
     fn sign(self) -> Self {
         if self > Self::ZERO {
@@ -56,6 +57,7 @@ macro_rules! impl_native_float {
             #[inline] fn min(self, other: Self) -> Self { <$t>::min(self, other) }
             #[inline] fn abs(self) -> Self { <$t>::abs(self) }
             #[inline] fn is_finite(self) -> bool { <$t>::is_finite(self) }
+            #[inline] fn mul_add(self, a: Self, b: Self) -> Self { <$t>::mul_add(self, a, b) }
         }
 
         impl Real for $t {

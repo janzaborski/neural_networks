@@ -368,6 +368,34 @@ where
     w.flush()
 }
 
+/// Classification: rows `x1,..,xn,true,pred` (original units, classes 1-based) for every sample.
+pub fn write_classification<T, H, O>(
+    path: impl AsRef<Path>,
+    net: &NeuralNetwork<T, H, O>,
+    data: &Dataset<T>,
+    norm: &Normalization<T>,
+) -> io::Result<()>
+where
+    T: Scalar,
+    H: Activation<T>,
+    O: Head<T>,
+{
+    let pred = argmax_rows(predict(net, data.x()).to_ref());
+    let truth = argmax_rows(data.y());
+    let mut x = Mat::zeros(data.x().shape());
+    data.x().copy_into(x.to_ref_mut());
+    norm.invert_x(x.to_ref_mut());
+
+    let mut w = BufWriter::new(File::create(path)?);
+    let header: Vec<String> = (1..=x.shape().cols()).map(|i| format!("x{i}")).collect();
+    writeln!(w, "{},true,pred", header.join(","))?;
+    for ((r, t), p) in x.row_iterator().zip(truth).zip(pred) {
+        let xs: Vec<String> = r.iter().map(|v| v.to_f64().to_string()).collect();
+        writeln!(w, "{},{},{}", xs.join(","), t + 1, p + 1)?;
+    }
+    w.flush()
+}
+
 /// Classification in 2D: predicted class (1-based) on a `steps × steps` grid
 /// covering the data range (original units) with a 10% margin.
 pub fn write_decision_grid<T, H, O>(
@@ -471,6 +499,7 @@ mod tests {
             task: TaskKind::Classification,
             train: Source::File(p.clone()),
             test: Some(Source::File(p.clone())),
+            eval: Default::default(),
             format: None,
             normalize: Normalize::None,
             first_label: Some(1),

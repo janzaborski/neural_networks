@@ -337,7 +337,7 @@ pub fn gemm<T: Scalar>(
                     let x = alpha * e_a;
                     r_b.iter()
                         .zip(r_c.iter_mut())
-                        .for_each(|(&e_b, e_c)| *e_c += x * e_b);
+                        .for_each(|(&e_b, e_c)| *e_c = e_b.mul_add(x, *e_c));
                 });
         });
 }
@@ -370,9 +370,30 @@ pub fn gemm_at<T: Scalar>(
                     let x = alpha * e_a;
                     r_b.iter()
                         .zip(r_c.iter_mut())
-                        .for_each(|(&e_b, e_c)| *e_c += x * e_b);
+                        .for_each(|(&e_b, e_c)| *e_c = e_b.mul_add(x, *e_c));
                 });
         });
+}
+
+const DOT_LANES: usize = 16;
+
+#[inline]
+fn dot_slices<T: Scalar>(x: &[T], y: &[T]) -> T {
+    debug_assert!(x.len() == y.len());
+
+    let cx = x.chunks_exact(DOT_LANES);
+    let cy = y.chunks_exact(DOT_LANES);
+    let (rx, ry) = (cx.remainder(), cy.remainder());
+
+    let mut acc = [T::ZERO; DOT_LANES];
+    cx.zip(cy).for_each(|(bx, by)| {
+        for k in 0..DOT_LANES {
+            acc[k] = bx[k].mul_add(by[k], acc[k]);
+        }
+    });
+
+    let s = acc.iter().fold(T::ZERO, |s, &v| s + v);
+    rx.iter().zip(ry).fold(s, |s, (&a, &b)| a.mul_add(b, s))
 }
 
 pub fn gemm_bt<T: Scalar>(
@@ -400,11 +421,7 @@ pub fn gemm_bt<T: Scalar>(
             r_c.iter_mut()
                 .zip(b.into_row_iterator())
                 .for_each(|(e_c, r_b)| {
-                    let acc = r_a
-                        .iter()
-                        .zip(r_b.iter())
-                        .fold(T::ZERO, |s, (&x, &y)| s + x * y);
-                    *e_c += alpha * acc;
+                    *e_c = alpha.mul_add(dot_slices(r_a, r_b), *e_c);
                 });
         });
 }
