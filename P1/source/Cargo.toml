@@ -3,6 +3,9 @@ name = "neural_net"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+asm-probe = []
+
 [dependencies]
 rand = "0.10.3"
 rand_chacha = "0.10.0"
@@ -10,3 +13,6 @@ rand_distr = "0.6.0"
 rayon = "1.12"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+#
+# [build]
+# rustflags = ["-C", "target-cpu=native"]

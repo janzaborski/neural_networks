@@ -1,4 +1,6 @@
 *.csv
+!data/projekt1/**/*.csv
+!figures/summary.csv
 
 # Cargo build artifacts
 /target/
@@ -38,5 +40,17 @@ Thumbs.db
 /results/
 /smoke_results/
 /archive/
-/out/study/
-__pycache__/
+/out/
+/configs/todo.json
+/data/derived/
+/data/*-ubyte
+__pycache__
+
+# LaTeX build files
+*.aux
+*.log
+*.toc
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz

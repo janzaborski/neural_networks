@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -66,6 +67,8 @@ pub struct DataSpec {
     pub train: Source,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub test: Option<Source>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub eval: BTreeMap<String, Source>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub format: Option<FileFormat>,
     #[serde(default)]
@@ -139,6 +142,7 @@ impl DataSpec {
             .paths()
             .into_iter()
             .chain(self.test.iter().flat_map(Source::paths))
+            .chain(self.eval.values().flat_map(Source::paths))
         {
             self.format_of(p)?;
         }
@@ -540,6 +544,7 @@ mod tests {
         let mut s = DataSpec {
             task,
             test: Some(train.clone()),
+            eval: BTreeMap::new(),
             train,
             format: None,
             normalize,
