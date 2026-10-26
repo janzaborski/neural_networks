@@ -30,18 +30,13 @@ neuronów.
 
 \section{Wstęp}
 
-Rozważamy dwa podstawowe zadania uczenia nadzorowanego. W \emph{klasyfikacji} na podstawie wektora
-cech należy wskazać jedną z kilku kategorii, np.\ przypisać punkt płaszczyzny do jednej z klas lub
-obraz cyfry do cyfry, którą przedstawia. W \emph{regresji} należy przewidzieć wartość liczbową,
-np.\ wartość nieznanej funkcji w danym punkcie. W obu przypadkach model uczy się na zbiorze
-przykładów z~znanymi odpowiedziami (zbiór uczący), a jego jakość ocenia się na osobnym zbiorze
-testowym, którego nie widział podczas uczenia.
+Rozważamy dwa podstawowe zadania uczenia nadzorowanego, klasyfikację i regresję.
 
 Celem projektu jest implementacja sieci MLP do obu zadań, wizualizacja jej działania i uczenia oraz
 zbadanie, jak na wyniki wpływają funkcja aktywacji, architektura sieci i funkcja kosztu. W części
 pierwszej korzystamy z małych zbiorów danych w~$\mathbb{R}^2$ (klasyfikacja) i~$\mathbb{R}$
-(regresja), które pozwalają wprost zobaczyć, czego nauczyła się sieć. W części drugiej tę samą
-implementację stosujemy do zbioru odręcznie pisanych cyfr MNIST.
+(regresja), które pozwalają łatwo zwizualizować, czego nauczyła się sieć. W części drugiej tę samą
+implementację stosujemy do zbioru MNIST.
 
 Rozdział~\ref{sec:teoria} krótko omawia ideę sieci MLP i ich uczenia, rozdział~\ref{sec:impl} naszą
 implementację, a rozdział~\ref{sec:procedura} procedurę eksperymentalną. Wyniki dla małych zbiorów
@@ -75,8 +70,7 @@ nie uczyły się identycznie.
 Gradient względem wszystkich parametrów wyznacza algorytm propagacji wstecznej
 (\emph{backpropagation}), oparty na regule łańcuchowej: błąd $\delta = \partial\mathcal{L}/\partial z$
 liczony względem wejść neuronów wyjściowych (przed aktywacją) jest przekazywany warstwa po warstwie
-w stronę wejścia, a w każdej warstwie wyznacza się z niego gradienty jej wag. Koszt obliczeń jest
-tego samego rzędu co jedno przejście w przód.
+w stronę wejścia, a w każdej warstwie wyznacza się z niego gradienty jej wag.
 
 Wszystkie te operacje można zapisać w języku algebry liniowej. Wagi warstwy tworzą macierz, a porcja
 danych macierz, której wiersze są przykładami; przejście w przód przez warstwę jest wtedy jednym
@@ -104,7 +98,7 @@ przykładów, jak i wierszy wag.
 Sieć to lista warstw (macierz wag i opcjonalny wektor biasów) wraz ze wspólną funkcją aktywacji
 warstw ukrytych oraz funkcją aktywacji wyjścia połączoną z funkcją kosztu. Przejście w przód
 składa się z mnożenia macierzy (GEMM), dodania biasu do każdego wiersza i zastosowania funkcji
-aktywacji element po elemencie. Wyniki pośrednie zapisywane są w przydzielanej raz pamięci roboczej
+aktywacji element. Wyniki pośrednie zapisywane są w przydzielanej raz pamięci roboczej
 i wykorzystywane podczas propagacji wstecznej. Gradienty wag i błąd przekazywany do poprzedniej
 warstwy liczone są wariantami GEMM, które traktują jeden z argumentów jako transponowany, więc
 transpozycji nie trzeba tworzyć w pamięci. Wagi inicjalizowane są losowo metodą
@@ -118,7 +112,7 @@ więc uczenie z tym samym plikiem i ziarnem jest w pełni powtarzalne. Program z
 razem z wynikami, a dla każdego ziarna: wartości kosztu i metryk w każdej epoce, predykcje
 na zbiorze testowym (dla danych jedno- i dwuwymiarowych) oraz opcjonalnie wagi wszystkich warstw i sygnały $\delta$ propagowane wstecz
 dla ustalonego przykładu uczącego. Na tej podstawie skrypty w Pythonie rysują wykresy z
-rozdziałów~\ref{sec:wyniki}--\ref{sec:mnist} oraz animację ewolucji wag w postaci grafu sieci.
+rozdziałów~\ref{sec:wyniki}--\ref{sec:mnist}.
 
 \section{Procedura eksperymentalna}
 \label{sec:procedura}
@@ -163,7 +157,7 @@ test w zakresie / poza zakresem & --- & --- & 599 / 401 & 796 / 204 \\
 Ponieważ najlepszy współczynnik uczenia zależy od funkcji aktywacji i kosztu, oba te badania
 powtórzono dla współczynników $\{0{,}003;\ 0{,}01;\ 0{,}03;\ 0{,}1;\ 0{,}3;\ 1\}$.
 
-\paragraph{Ocena.} Hiperparametrów nie dobieraliśmy na podstawie zbioru testowego: sieć uczy się na
+\paragraph{Ocena.} Siećeć uczy się na
 całym zbiorze uczącym przez stałą liczbę epok, a zbiór testowy jest oceniany po każdej epoce
 wyłącznie w celu zapisu wyników. Mierzymy trafność (accuracy) i macro-F1 w klasyfikacji oraz MSE
 i MAE (w oryginalnych jednostkach $y$) w regresji. Ponieważ przy stałym współczynniku uczenia
@@ -286,7 +280,7 @@ epokach są bliskie zeru.
   \caption{Wagi sieci $2\times8$ (\emph{cube}, ziarno 0) w epokach 0, 10, 100 i 1000. Kolor
   krawędzi to znak wagi (czerwony -- dodatnia, niebieski -- ujemna), grubość i nasycenie --
   jej wartość bezwzględna; wypełnienie neuronu oznacza bias. Każda warstwa ma własną skalę.
-  Pełna animacja: \texttt{weights\_graph.gif} w katalogu wyników.}
+  }
   \label{fig:graf}
 \end{figure}
 

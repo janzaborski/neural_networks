@@ -432,14 +432,17 @@ def prediction_figures(dataset, rows, task):
                     vmin=0.5,
                     vmax=k + 0.5,
                     s=4,
+                    alpha=0.6,
+                    zorder=2,
                 )
                 ax.scatter(
                     test.x1[wrong],
                     test.x2[wrong],
                     marker="x",
                     color="black",
-                    s=14,
-                    lw=0.8,
+                    s=45,
+                    lw=1.6,
+                    zorder=3,
                     label=f"pomyłki: {wrong.sum()}/{len(test)}",
                 )
                 ax.legend(fontsize=8, loc="lower right")

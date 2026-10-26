@@ -40,19 +40,19 @@ simple: przebieg koszt (test) w trakcie uczenia dla różnych funkcji aktywacji 
 
 ### `fig:simple:predictions_relu`
 
-simple: obszary decyzyjne sieci z aktywacją relu (ziarno 0).
+simple: obszary decyzyjne sieci z aktywacją relu (ziarno 0). Punkty testowe w kolorze prawdziwej klasy, × oznacza pomyłkę (accuracy 0.995).
 
 ![predictions_relu](simple/predictions_relu.png)
 
 ### `fig:simple:predictions_sigmoid`
 
-simple: obszary decyzyjne sieci z aktywacją sigmoid (ziarno 0).
+simple: obszary decyzyjne sieci z aktywacją sigmoid (ziarno 0). Punkty testowe w kolorze prawdziwej klasy, × oznacza pomyłkę (accuracy 0.997).
 
 ![predictions_sigmoid](simple/predictions_sigmoid.png)
 
 ### `fig:simple:predictions_tanh`
 
-simple: obszary decyzyjne sieci z aktywacją tanh (ziarno 0).
+simple: obszary decyzyjne sieci z aktywacją tanh (ziarno 0). Punkty testowe w kolorze prawdziwej klasy, × oznacza pomyłkę (accuracy 0.995).
 
 ![predictions_tanh](simple/predictions_tanh.png)
 
@@ -136,19 +136,19 @@ three_gauss: przebieg koszt (test) w trakcie uczenia dla różnych funkcji aktyw
 
 ### `fig:three_gauss:predictions_relu`
 
-three_gauss: obszary decyzyjne sieci z aktywacją relu (ziarno 0).
+three_gauss: obszary decyzyjne sieci z aktywacją relu (ziarno 0). Punkty testowe w kolorze prawdziwej klasy, × oznacza pomyłkę (accuracy 0.933).
 
 ![predictions_relu](three_gauss/predictions_relu.png)
 
 ### `fig:three_gauss:predictions_sigmoid`
 
-three_gauss: obszary decyzyjne sieci z aktywacją sigmoid (ziarno 0).
+three_gauss: obszary decyzyjne sieci z aktywacją sigmoid (ziarno 0). Punkty testowe w kolorze prawdziwej klasy, × oznacza pomyłkę (accuracy 0.932).
 
 ![predictions_sigmoid](three_gauss/predictions_sigmoid.png)
 
 ### `fig:three_gauss:predictions_tanh`
 
-three_gauss: obszary decyzyjne sieci z aktywacją tanh (ziarno 0).
+three_gauss: obszary decyzyjne sieci z aktywacją tanh (ziarno 0). Punkty testowe w kolorze prawdziwej klasy, × oznacza pomyłkę (accuracy 0.933).
 
 ![predictions_tanh](three_gauss/predictions_tanh.png)
 
