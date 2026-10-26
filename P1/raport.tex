@@ -98,7 +98,7 @@ przykładów, jak i wierszy wag.
 Sieć to lista warstw (macierz wag i opcjonalny wektor biasów) wraz ze wspólną funkcją aktywacji
 warstw ukrytych oraz funkcją aktywacji wyjścia połączoną z funkcją kosztu. Przejście w przód
 składa się z mnożenia macierzy (GEMM), dodania biasu do każdego wiersza i zastosowania funkcji
-aktywacji element. Wyniki pośrednie zapisywane są w przydzielanej raz pamięci roboczej
+aktywacji dla każdego elementu. Wyniki pośrednie zapisywane są w przydzielanej raz pamięci roboczej
 i wykorzystywane podczas propagacji wstecznej. Gradienty wag i błąd przekazywany do poprzedniej
 warstwy liczone są wariantami GEMM, które traktują jeden z argumentów jako transponowany, więc
 transpozycji nie trzeba tworzyć w pamięci. Wagi inicjalizowane są losowo metodą
@@ -157,7 +157,7 @@ test w zakresie / poza zakresem & --- & --- & 599 / 401 & 796 / 204 \\
 Ponieważ najlepszy współczynnik uczenia zależy od funkcji aktywacji i kosztu, oba te badania
 powtórzono dla współczynników $\{0{,}003;\ 0{,}01;\ 0{,}03;\ 0{,}1;\ 0{,}3;\ 1\}$.
 
-\paragraph{Ocena.} Siećeć uczy się na
+\paragraph{Ocena.} Sieć uczy się na
 całym zbiorze uczącym przez stałą liczbę epok, a zbiór testowy jest oceniany po każdej epoce
 wyłącznie w celu zapisu wyników. Mierzymy trafność (accuracy) i macro-F1 w klasyfikacji oraz MSE
 i MAE (w oryginalnych jednostkach $y$) w regresji. Ponieważ przy stałym współczynniku uczenia
@@ -193,8 +193,8 @@ pozostałe pozostają bez zmian.}
 
 \subsection{Wizualizacja uczenia}
 
-Rysunek~\ref{fig:klasyfikacja} przedstawia obszary decyzyjne sieci bazowej. Na \emph{simple} sieć
-myli się tylko przy granicy klas, a na \emph{three\_gauss} w obszarach, gdzie klasy się nakładają.
+Rysunek~\ref{fig:klasyfikacja} przedstawia obszary decyzyjne sieci bazowej i jej pomyłki na zbiorze
+testowym.
 Rysunek~\ref{fig:regresja} pokazuje funkcje nauczone w regresji: w zakresie danych uczących sieć
 pokrywa się z funkcją docelową, a poza nim jej przebieg zależy od funkcji aktywacji.
 
@@ -212,9 +212,10 @@ pokrywa się z funkcją docelową, a poza nim jej przebieg zależy od funkcji ak
     \includegraphics[width=\linewidth]{figures/three_gauss/confusion_tanh_32x32.png}
     \caption{\emph{three\_gauss}}
   \end{subfigure}
-  \caption{Klasyfikacja siecią bazową. (a), (b): tło -- klasa przewidziana przez sieć, punkty --
-  zbiór testowy w kolorze prawdziwej klasy, $\times$ -- pomyłka (ziarno 0). (c): macierz pomyłek
-  na zbiorze testowym zsumowana po ziarnach.}
+  \caption{Klasyfikacja siecią bazową nauczoną z ziarnem 0. (a), (b): kolor tła -- klasa przewidziana
+  przez sieć w punktach siatki $100\times100$ pokrywającej zakres danych uczących; punkty -- zbiór
+  testowy w kolorze prawdziwej klasy, $\times$ -- punkt testowy sklasyfikowany błędnie.
+  (c): macierz pomyłek na zbiorze testowym zsumowana po 5 ziarnach.}
   \label{fig:klasyfikacja}
 \end{figure}
 
@@ -306,13 +307,13 @@ epokach są bliskie zeru.
 Wyniki dla wszystkich architektur przedstawia rys.~\ref{fig:arch}. W klasyfikacji architektura ma
 niewielki wpływ. Na \emph{simple} najlepsza jest sieć bez warstw ukrytych (99,6\%), a sieci głębsze
 osiągają 99,1--99,5\%. Na \emph{three\_gauss} sieć liniowa osiąga 92,4\%, a każda sieć z warstwami
-ukrytymi 93,4--93,7\%; sieci z~3--4 warstwami mają wyższą trafność na zbiorze uczącym niż testowym
+ukrytymi 93,3--93,7\%; sieci z~3--4 warstwami mają wyższą trafność na zbiorze uczącym niż testowym
 (np.\ $4\times16$: 93,8\% wobec 93,4\%).
 
 W regresji sieć bez warstw ukrytych nie jest w stanie dopasować funkcji (MSE 990 na \emph{cube}
 i 707 na \emph{activation}), natomiast już jedna warstwa ukryta zmniejsza błąd o 3--5 rzędów
-wielkości. Na \emph{cube} sieci z~2--4 warstwami są zwykle lepsze niż z jedną (MSE 0,2--0,9 wobec
-1,0--1,7). Poza zakresem uczenia (rys.~\ref{fig:arch-out}) błąd na \emph{cube} rośnie z liczbą
+wielkości. Na \emph{cube} większość sieci z~2--4 warstwami osiąga MSE 0,2--0,9, wobec
+1,0--1,7 dla jednej warstwy. Poza zakresem uczenia (rys.~\ref{fig:arch-out}) błąd na \emph{cube} rośnie z liczbą
 warstw, a dla sieci z jedną warstwą maleje z jej szerokością.
 
 \begin{figure}[htbp]
@@ -512,8 +513,8 @@ Trafność rośnie przede wszystkim z szerokością warstw (rys.~\ref{fig:mnist-
 tab.~\ref{tab:mnist-arch}): od 92,4\% dla sieci liniowej, przez 96,8\% ($1\times32$) i 97,8\%
 ($1\times128$), do 98,3\% dla $2\times512$. Druga warstwa ukryta daje niewielki zysk, trzecia
 żaden. Sieci $2\times512$, $3\times128$ i $3\times512$ osiągają 100\% trafności na zbiorze
-uczącym, a różnica między trafnością uczącą i testową rośnie z rozmiarem sieci
-(rys.~\ref{fig:mnist-krzywe}b). Koszt na zbiorze uczącym maleje przez całe uczenie, natomiast
+uczącym, a sieci z warstwami ukrytymi mają trafność na zbiorze uczącym o 1,4--2,0 p.p.\ wyższą niż
+na testowym (sieć liniowa: 0,4 p.p., rys.~\ref{fig:mnist-krzywe}b). Koszt na zbiorze uczącym maleje przez całe uczenie, natomiast
 koszt testowy po ok.\ 10 epokach prawie przestaje maleć (rys.~\ref{fig:mnist-krzywe}a).
 
 \begin{figure}[htbp]
@@ -634,9 +635,9 @@ przy największych współczynnikach uczenia. Z przeprowadzonych badań wynika, 
 \begin{itemize}
   \item w regresji konieczna jest co najmniej jedna warstwa ukryta, natomiast w prostych
   zadaniach klasyfikacji w $\mathbb{R}^2$ warstwy ukryte dają niewielki zysk; dodatkowe warstwy
-  nie poprawiają wyniku w zakresie danych uczących i pogarszają ekstrapolację,
+  dają niewielki zysk w zakresie danych uczących i pogarszają ekstrapolację,
   \item wpływ funkcji aktywacji zależy od współczynnika uczenia: sigmoida wymaga większego kroku,
-  ale jest stabilna, a $\tanh$ i ReLU uczą się szybciej, lecz przy dużym kroku mogą się rozbiegać;
+  ale jest stabilna, a $\tanh$ i ReLU osiągają dobre wyniki przy mniejszym kroku, lecz przy dużym kroku mogą się rozbiegać;
   poza zakresem danych uczących sieć przejmuje kształt funkcji aktywacji,
   \item w klasyfikacji entropia krzyżowa daje lepsze lub podobne wyniki niż MSE przy mniejszym
   kroku, a w regresji MSE jest lepsze od MAE, także w mierze MAE,
