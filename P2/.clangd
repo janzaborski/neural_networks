@@ -1,0 +1,11 @@
+CompileFlags:
+  Add: [-std=c++26]
+  Remove:
+    - -fmodules
+    - -fmodules-ts
+    - -fmodule-mapper=*
+    - -fdeps-format=*
+    - -fdeps-file=*
+    - -fdeps-target=*
+    - -freflection
+    - "@*"
