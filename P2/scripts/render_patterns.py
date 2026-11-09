@@ -7,12 +7,13 @@ import numpy as np
 from common import FIG_DIR, ROOT, Dataset, datasets
 
 os.environ.setdefault("MPLCONFIGDIR", str(ROOT / ".cache" / "matplotlib"))
-import matplotlib
+import matplotlib  # noqa: E402
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-from PIL import Image
-import make_noise
+import matplotlib.pyplot as plt  # noqa: E402
+from PIL import Image  # noqa: E402
+
+import make_noise  # noqa: E402
 
 
 def to_pixels(ds: Dataset, state: np.ndarray, scale: int) -> Image.Image:
@@ -48,6 +49,45 @@ def sheet(
     plt.close(fig)
 
 
+DAMAGE_KINDS = ["flip", "block", "erase", "shift", "mix"]
+KIND_LABELS = {
+    "flip": "odwrócenie pikseli",
+    "block": "zaszumiony prostokąt",
+    "erase": "wymazany pas",
+    "shift": "przesunięcie",
+    "mix": "mieszanka z innym",
+    "invert": "negatyw",
+}
+
+
+def level_label(kind: str, level: float) -> str:
+    if kind == "shift":
+        return f"{int(level)} px"
+    return f"{level:.0%}"
+
+
+def sheet_rows(ds: Dataset, rows, path):
+    cols = max(len(states) for _, states, _ in rows)
+    aspect = ds.height / ds.width
+    fig, axes = plt.subplots(
+        len(rows),
+        cols,
+        figsize=(1.3 * cols + 1.2, 1.3 * aspect * len(rows) + 0.6),
+        squeeze=False,
+    )
+    for ax in axes.flat:
+        ax.axis("off")
+    for r, (label, states, titles) in enumerate(rows):
+        for c, (state, title) in enumerate(zip(states, titles)):
+            ax = axes[r, c]
+            ax.axis("on")
+            show(ax, ds, state, title)
+        axes[r, 0].set_ylabel(label, fontsize=8, rotation=0, ha="right", va="center")
+    fig.tight_layout()
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+
+
 def render(ds: Dataset, scale: int):
     out = FIG_DIR / ds.name
     (out / "patterns").mkdir(parents=True, exist_ok=True)
@@ -63,29 +103,52 @@ def render(ds: Dataset, scale: int):
     )
 
     rng = np.random.default_rng(0)
-    levels = [0.0] + make_noise.FLIP_LEVELS
-    flipped = [make_noise.flip(patterns[0], lv, rng) for lv in levels]
-    sheet(
-        ds,
-        flipped,
-        [f"{lv:.0%}" for lv in levels],
-        out / "noise_flip.png",
-        max_cols=len(levels),
+    rows = []
+    for kind in DAMAGE_KINDS:
+        levels = make_noise.KINDS[kind]
+        states = [patterns[0]] + [
+            make_noise.damage(kind, patterns, 0, ds, lv, rng) for lv in levels
+        ]
+        titles = ["oryginał"] + [level_label(kind, lv) for lv in levels]
+        sheet(ds, states, titles, out / f"noise_{kind}.png", max_cols=len(states))
+        rows.append((KIND_LABELS[kind], states, titles))
+    rows.append(
+        (KIND_LABELS["invert"], [patterns[0], -patterns[0]], ["oryginał", "negatyw"])
+    )
+    sheet_rows(ds, rows, out / "noise_examples.png")
+    print(f"{ds.name}: {len(patterns)} patterns {ds.width}x{ds.height} -> {out}")
+    return len(patterns)
+
+
+def figure(path: str, width: str, caption: str, label: str) -> str:
+    return (
+        "\\begin{figure}[htbp]\n"
+        "  \\centering\n"
+        f"  \\includegraphics[width={width}]{{{path}}}\n"
+        f"  \\caption{{{caption}}}\n"
+        f"  \\label{{{label}}}\n"
+        "\\end{figure}\n"
     )
 
-    levels = [0.0] + make_noise.BLOCK_LEVELS
-    blocked = [
-        make_noise.block(patterns[0], ds, lv, rng) if lv > 0 else patterns[0]
-        for lv in levels
-    ]
-    sheet(
-        ds,
-        blocked,
-        [f"{lv:.0%}" for lv in levels],
-        out / "noise_block.png",
-        max_cols=len(levels),
+
+def latex_blocks(ds: Dataset, n_patterns: int) -> str:
+    width = f"{min(1.0, 0.12 * min(8, n_patterns)):.2f}\\linewidth"
+    name = f"\\texttt{{{ds.name}}}"
+    patterns = figure(
+        f"figures/{ds.name}/patterns.png",
+        width,
+        f"Zbiór {name}: {n_patterns} wzorców o rozmiarze ${ds.width}\\times{ds.height}$ ($n = {ds.n}$). "
+        "Czarny piksel to stan $1$, biały $-1$.",
+        f"fig:{ds.name}:patterns",
     )
-    print(f"{ds.name}: {len(patterns)} patterns {ds.width}x{ds.height} -> {out}")
+    noise = figure(
+        f"figures/{ds.name}/noise_examples.png",
+        "\\linewidth",
+        f"Przykłady uszkodzonych wejść utworzonych z wzorca 0 zbioru {name}: "
+        "wszystkie rodzaje i poziomy uszkodzenia.",
+        f"fig:{ds.name}:noise",
+    )
+    return patterns + "\n" + noise
 
 
 def main():
@@ -100,8 +163,12 @@ def main():
         help="pixels per cell in patterns/pattern_XX.png",
     )
     args = p.parse_args()
+    blocks = []
     for ds in datasets(args.datasets):
-        render(ds, args.scale)
+        blocks.append(latex_blocks(ds, render(ds, args.scale)))
+    tex = FIG_DIR / "patterns.tex"
+    tex.write_text("\n".join(blocks))
+    print(f"{len(blocks)} figure blocks -> {tex}")
 
 
 if __name__ == "__main__":

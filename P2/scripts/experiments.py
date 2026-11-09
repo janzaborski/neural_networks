@@ -12,7 +12,8 @@ import make_noise
 
 RULES = ["hebb", "oja"]
 MODES = ["sync", "async"]
-KINDS = ["patterns", "flip", "block", "random"]
+KINDS = ["patterns", *make_noise.KINDS]
+DETERMINISTIC = {"patterns", "invert"}
 SEEDS = make_noise.SEEDS
 MAX_STEPS = 100
 TRAJECTORY_SETS = {
@@ -20,17 +21,16 @@ TRAJECTORY_SETS = {
     ("flip", 0.10),
     ("flip", 0.30),
     ("block", 0.30),
+    ("erase", 0.50),
+    ("shift", 2.0),
+    ("mix", 0.50),
+    ("invert", 0.0),
     ("random", 0.0),
 }
 
 
 def levels(kind: str) -> list[float]:
-    return {
-        "patterns": [0.0],
-        "flip": make_noise.FLIP_LEVELS,
-        "block": make_noise.BLOCK_LEVELS,
-        "random": [0.0],
-    }[kind]
+    return [0.0] if kind == "patterns" else make_noise.KINDS[kind]
 
 
 def build_grid(args) -> list[dict]:
@@ -42,7 +42,7 @@ def build_grid(args) -> list[dict]:
                     for level in levels(kind):
                         seeds = (
                             [0]
-                            if (kind == "patterns" and mode == "sync")
+                            if (kind in DETERMINISTIC and mode == "sync")
                             else SEEDS[: args.seeds]
                         )
                         for seed in seeds:

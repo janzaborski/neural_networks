@@ -1,0 +1,344 @@
+\documentclass{article}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\setlength{\emergencystretch}{1em}
+\usepackage[polish]{babel}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage[section]{placeins}
+
+\title{Implementacja i analiza sieci Hopfielda w zadaniu odtwarzania wzorców}
+\author{Hubert Błonowski \and Jan Zaborski}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Zaimplementowaliśmy od podstaw sieć Hopfielda z dwiema regułami uczenia: Hebba i Oji,
+oraz dwoma trybami odtwarzania: synchronicznym i asynchronicznym.
+Zbadaliśmy działanie sieci na zbiorach prostych bitmap, mierząc skuteczność metrykami
+oraz szczegółowo analizując konkretne przypadki podatne na nieprawidłowe działanie sieci.
+\end{abstract}
+
+\tableofcontents
+
+\section{Wstęp}
+Rozważamy zadanie odtwarzania wzorców, polegające na odtworzeniu najbliższego zapamiętanego wzorca
+ze zbioru wzorców zapamiętanych przez sieć na podstawie wzorca wejściowego.
+Za wzorzec będziemy przyjmować wektor stanów.
+Istotną różnicą między odtwarzaniem wzorców a klasyfikacją jest możliwość zwrócenia wzorca spoza zbioru wzorców zapamiętanych,
+w szczególnych przypadkach przeciwnego wzorca (stany przeciwne do stanów zapamiętanego wzorca) lub mieszanki wzorców (część stanów z jednego, część z drugiego).
+Do realizacji zadania wykorzystamy sieć Hopfielda.
+
+Rozdział~\ref{sec:teoria} krótko omawia ideę sieci Hopfielda i ich uczenia,
+rozdział~\ref{sec:impl} implementację,
+a rozdział~\ref{sec:proc} procedurę eksperymentalną.
+Wyniki przedstawia rozdział~\ref{sec:wyniki}.
+
+\section{Podstawy teoretyczne}
+\label{sec:teoria}
+
+Sieć Hopfielda to sieć neuronowa, w której neurony $x_i$ przechowują stany
+i każda para różnych neuronów jest połączona krawędzią o pewnej wadze (odpowiada to nieskierowanej, ważonej klice, gdzie każdy wierzchołek ma przypisaną liczbę).
+Będziemy badać jedynie architekturę, w której stany należą do zbioru $\{-1,\, 1\}$, a wagi do zbioru liczb rzeczywistych.
+Zatem wzorce zapamiętane, wejścia, wyjścia i stany pośrednie sieci będziemy oznaczać wektorem $\mathbf{x} \in \{-1,\, 1\}^{n}$,
+gdzie $n$ to ustalona wspólna wymiarowość ich wszystkich (liczba neuronów).
+Wagi będzie opisywać macierz $\mathbf{W} = \left[w_{ij}\right]_{i,\, j = 1, \ldots, n} \in \mathbb{R}^{n \times n}$,
+gdzie $w_{ij}$ oznacza wagę krawędzi między $x_i$ a $x_j$.
+Ponieważ krawędzie są nieskierowane, macierz jest symetryczna ($w_{ij} = w_{ji}$),
+a $w_{ii} = 0$ odpowiada temu, że żaden neuron nie jest połączony z samym sobą.
+
+\subsection{Uczenie}
+Pamięć modelu będziemy kodować w wagach między neuronami.
+Rozważamy dwie reguły wyznaczania macierzy $\mathbf{W}$: regułę Hebba (rozdz.~\ref{sec:hebb}) oraz regułę Oji (rozdz.~\ref{sec:oji}).
+
+Oznaczamy $\mathbf{X} = \left[\mathbf{x}^{(p)} : p = 1, \ldots, N\right]$ jako zbiór wzorców zapamiętywanych przez sieć,
+gdzie $N$ to liczba wzorców, $\mathbf{x}^{(p)}$ to wektor stanów wzorca o indeksie $p$,
+a $\mathbf{X} \in \{-1,\, 1\}^{N \times n}$ jest macierzą, której kolejne wiersze odpowiadają kolejnym wzorcom (ich wektorom stanów).
+
+\subsubsection{Reguła Hebba}
+\label{sec:hebb}
+Macierz wag obliczamy ze wzoru
+\[
+  \mathbf{W} = \frac{1}{n}\left(\mathbf{X}^{T}\mathbf{X} - N\mathbf{I}_{n}\right).
+\]
+Każdy element przekątnej $\mathbf{X}^{T}\mathbf{X}$ jest równy $N$, więc odjęcie $N\mathbf{I}_{n}$ zeruje przekątną.
+Dodatni czynnik $\frac{1}{n}$ nie zmienia znaków pól lokalnych, a zatem nie wpływa na przebieg odtwarzania;
+utrzymuje jedynie wagi i energię w podobnej skali niezależnie od liczby neuronów.
+
+\subsubsection{Reguła Oji}
+\label{sec:oji}
+
+\subsection{Odtwarzanie wzorca}
+Rozważamy dwa tryby odtwarzania wzorca: synchroniczny (rozdz.~\ref{sec:sync}) oraz asynchroniczny (rozdz.~\ref{sec:async}).
+Indeks iteracji zapisujemy w indeksie górnym w nawiasach kwadratowych:
+$\mathbf{x}^{[t]}$ oznacza stan sieci po $t$ iteracjach, a $\mathbf{x}^{[0]}$ wzorzec wejściowy
+(nawiasy okrągłe, jak w $\mathbf{x}^{(p)}$, oznaczają numer wzorca zapamiętanego).
+W obu trybach stan neuronu jest wielokrotnie ustawiany zgodnie ze znakiem jego \emph{pola lokalnego},
+czyli ważonej sumy stanów pozostałych neuronów:
+\[
+  h_i = \sum_{j=1}^{n} w_{ij}\, x_j ,
+  \qquad
+  x_i \leftarrow
+  \begin{cases}
+    1,   & h_i > 0, \\
+    -1,  & h_i < 0, \\
+    x_i, & h_i = 0.
+  \end{cases}
+\]
+Stan $\mathbf{x}$, w którym żaden neuron nie zmienia się po aktualizacji, nazywamy \emph{stanem stabilnym}.
+Wzorzec zapamiętany jest odtwarzany poprawnie tylko wtedy, gdy jest stanem stabilnym sieci.
+
+Przydatną wielkością jest \emph{energia} stanu
+\[
+  E(\mathbf{x}) = -\frac{1}{2}\, \mathbf{x}^{T}\mathbf{W}\mathbf{x}.
+\]
+Wzorce zapamiętane leżą zwykle w minimach lokalnych energii, a odtwarzanie można traktować jako schodzenie do najbliższego takiego minimum.
+
+\subsubsection{Odtwarzanie synchroniczne}
+\label{sec:sync}
+W trybie synchronicznym wszystkie neurony są aktualizowane jednocześnie, na podstawie stanu z poprzedniej iteracji:
+\begin{enumerate}
+  \item Przyjmij $\mathbf{x}^{[0]}$ równe wzorcowi wejściowemu.
+  \item W iteracji $t = 0, 1, \ldots$ oblicz pola lokalne $\mathbf{h}^{[t]} = \mathbf{W}\mathbf{x}^{[t]}$
+        i dla wszystkich neuronów naraz ustaw
+        \[
+          x_i^{[t+1]} =
+          \begin{cases}
+            1,         & h_i^{[t]} > 0, \\
+            -1,        & h_i^{[t]} < 0, \\
+            x_i^{[t]}, & h_i^{[t]} = 0.
+          \end{cases}
+        \]
+  \item Zakończ, gdy $\mathbf{x}^{[t+1]} = \mathbf{x}^{[t]}$ (stan stabilny),
+        gdy $\mathbf{x}^{[t+1]} = \mathbf{x}^{[t-1]}$ (cykl długości 2)
+        lub po osiągnięciu maksymalnej liczby iteracji.
+\end{enumerate}
+Dla symetrycznej macierzy wag odtwarzanie synchroniczne zawsze kończy się w stanie stabilnym
+albo w cyklu długości 2, w którym sieć oscyluje między dwoma stanami~\cite{bruck1990}.
+
+\subsubsection{Odtwarzanie asynchroniczne}
+\label{sec:async}
+W trybie asynchronicznym neurony są aktualizowane pojedynczo, a każdy od razu korzysta z aktualnych stanów pozostałych.
+Iteracją jest tu jeden przebieg po wszystkich neuronach, a $\mathbf{x}^{[t]}$ oznacza stan po $t$ przebiegach:
+\begin{enumerate}
+  \item Przyjmij $\mathbf{x}^{[0]}$ równe wzorcowi wejściowemu.
+  \item W przebiegu $t = 0, 1, \ldots$ zacznij od $\mathbf{x} = \mathbf{x}^{[t]}$
+        i odwiedź wszystkie neurony w losowej kolejności;
+        dla odwiedzanego neuronu $i$ oblicz $h_i$ na podstawie bieżącego stanu $\mathbf{x}$
+        (z uwzględnieniem zmian wprowadzonych wcześniej w tym przebiegu) i ustaw
+        \[
+          x_i \leftarrow
+          \begin{cases}
+            1,   & h_i > 0, \\
+            -1,  & h_i < 0, \\
+            x_i, & h_i = 0.
+          \end{cases}
+        \]
+        Stan po odwiedzeniu wszystkich neuronów to $\mathbf{x}^{[t+1]}$.
+  \item Zakończ, gdy $\mathbf{x}^{[t+1]} = \mathbf{x}^{[t]}$, czyli w całym przebiegu żaden neuron nie zmienił stanu (stan stabilny),
+        lub po osiągnięciu maksymalnej liczby przebiegów.
+\end{enumerate}
+Dla symetrycznej macierzy wag o zerowej przekątnej każda zmiana stanu pojedynczego neuronu obniża energię $E(\mathbf{x})$,
+a stanów jest skończenie wiele, więc odtwarzanie asynchroniczne zawsze kończy się w stanie stabilnym~\cite{hopfield1982};
+w przeciwieństwie do trybu synchronicznego nie występują tu oscylacje.
+
+\section{Implementacja sieci}
+\label{sec:impl}
+Sieć zaimplementowano w języku C++ w standardzie C++26, korzystając jedynie z biblioteki standardowej.
+Własnoręcznie zaimplementowano model macierzy dwuwymiarowej (i wybrane operacje z algebry liniowej),
+oraz model sieci Hopfielda z API do uczenia sieci oraz generowania kolejnych kroków odtwarzania według wcześniej wspomnianych trybów.
+
+\section{Procedura eksperymentalna}
+\label{sec:proc}
+
+\subsection{Zbiory danych}
+\label{sec:dane}
+Przebadano działanie sieci, wykorzystując 8 zbiorów danych jako pamięć modelu (tab.~\ref{tab:zbiory}).
+Każdy zbiór to bitmapy o ustalonym rozmiarze $W \times H$ (szerokość $\times$ wysokość),
+spłaszczone wierszami do wektorów stanów o długości $n = WH$;
+piksel czarny odpowiada stanowi $1$, biały stanowi $-1$.
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{lccc}
+\toprule
+zbiór & rozmiar $W \times H$ & neurony $n$ & wzorce $N$ \\
+\midrule
+\texttt{small-7x7}         & $7 \times 7$   & 49   & 5  \\
+\texttt{letters-abc-8x12}  & $8 \times 12$  & 96   & 3  \\
+\texttt{animals-14x9}      & $14 \times 9$  & 126  & 6  \\
+\texttt{letters-14x20}     & $14 \times 20$ & 280  & 26 \\
+\texttt{OCRA-12x30-cut}    & $12 \times 30$ & 360  & 7  \\
+\texttt{large-25x25}       & $25 \times 25$ & 625  & 6  \\
+\texttt{large-25x25.plus}  & $25 \times 25$ & 625  & 15 \\
+\texttt{large-25x50}       & $25 \times 50$ & 1250 & 6  \\
+\bottomrule
+\end{tabular}
+\caption{Zbiory wzorców zapamiętywanych przez sieć.}
+\label{tab:zbiory}
+\end{table}
+
+Jako wzorce wejściowe do odtwarzania posłużyły zmodyfikowane wzorce z pamięci modelu:
+\begin{itemize}
+    \item \textbf{odwrócenie pikseli} -- $pn$ (po zaokrągleniu do liczby całkowitej) losowo wybranych pikseli
+        zmienia stan na przeciwny, dla $p$ równego 5, 10, 15, 20, 25, 30, 40 i 50\%;
+  \item \textbf{zaszumiony prostokąt} -- prostokąt o proporcjach obrazu i polu ok.\ $p$ obrazu, w losowym położeniu,
+        zastąpiony losowymi stanami, dla $p$ równego 10, 20, 30, 40 i 50\%;
+  \item \textbf{wymazany pas} -- pas o polu $p$ obrazu przy losowo wybranej krawędzi (górnej, dolnej, lewej lub prawej)
+        ustawiony na $-1$ (tło), dla $p$ równego 25, 50 i 75\%;
+  \item \textbf{przesunięcie} -- obraz przesunięty o 1, 2 lub 3 piksele w losowym kierunku,
+        odsłonięty pas wypełniony stanem $-1$;
+  \item \textbf{mieszanka} -- pierwsze $q$ kolumn pochodzi z wzorca źródłowego, pozostałe z innego, losowo wybranego wzorca
+        tego samego zbioru, dla $q$ równego 50 i 75\%;
+  \item \textbf{negatyw} -- wzorzec o wszystkich stanach przeciwnych, $-\mathbf{x}^{(p)}$.
+\end{itemize}
+Każdy wzorzec zapamiętany był źródłem 4 uszkodzonych wejść dla każdego rodzaju i poziomu uszkodzenia
+(negatyw: jednego). Dodatkowo do sieci podawano 50 wejść losowych, w których każdy stan wynosi $1$ lub $-1$
+z prawdopodobieństwem $\frac{1}{2}$, niezwiązanych z żadnym wzorcem.
+Wszystkie wejścia generowano dla 5 ziaren generatora liczb losowych (0--4);
+to samo ziarno wyznacza też kolejność aktualizacji neuronów w trybie asynchronicznym.
+Odtwarzanie synchroniczne wzorców niezmienionych i negatywów jest deterministyczne, więc wykonano je jednokrotnie.
+
+Ponieważ sieć Hopfielda ocenia wejście wyłącznie przez liczbę stanów różniących je od wzorców,
+dla każdego wejścia mierzymy też \emph{odległość Hamminga} od wzorca źródłowego, czyli liczbę różniących się stanów.
+Pozwala to porównywać różne rodzaje uszkodzeń na wspólnej skali.
+
+\subsubsection{Zbiór \texttt{animals}}
+\label{sec:ds_animals}
+Zbiór składa się z 6 obrazków przedstawiających uproszczone sylwetki zwierząt.
+Obrazki są rozmiaru $14 \times 9$~px.
+Rysunek~\ref{fig:animals-14x9:patterns} przedstawia obrazki zawarte w zbiorze.
+Rysunek~\ref{fig:animals-14x9:noise} przedstawia przykładowe modyfikacje wykorzystywane w eksperymentach.
+Reszta zbiorów korzysta z tych samych modyfikacji, dlatego pominiemy dalsze przykłady.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.72\linewidth]{figures/animals-14x9/patterns.png}
+  \caption{Zbiór \texttt{animals}: 6 wzorców o rozmiarze $14\times9$ ($n = 126$). Czarny piksel to stan $1$, biały $-1$.}
+  \label{fig:animals-14x9:patterns}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{figures/animals-14x9/noise_examples.png}
+  \caption{Przykłady uszkodzonych wejść utworzonych z wzorca 0 zbioru \texttt{animals}: wszystkie rodzaje i poziomy uszkodzenia.}
+  \label{fig:animals-14x9:noise}
+\end{figure}
+
+\subsubsection{Zbiór \texttt{large}}
+\label{sec:ds_large}
+Zbiór składa się z 6 obrazków bez wspólnego motywu.
+Obrazki są rozmiaru $25 \times 25$~px.
+Rysunek~\ref{fig:large-25x25:patterns} przedstawia obrazki zawarte w zbiorze.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.72\linewidth]{figures/large-25x25/patterns.png}
+  \caption{Zbiór \texttt{large}: 6 wzorców o rozmiarze $25\times25$ ($n = 625$). Czarny piksel to stan $1$, biały $-1$.}
+  \label{fig:large-25x25:patterns}
+\end{figure}
+
+\subsubsection{Zbiór \texttt{large plus}}
+\label{sec:ds_large_plus}
+Zbiór składa się z 15 obrazków, z czego 6 pochodzi ze zbioru \texttt{large} (rozdz.~\ref{sec:ds_large}).
+Obrazki są tego samego formatu.
+Rysunek~\ref{fig:large-25x25.plus:patterns} przedstawia obrazki zawarte w zbiorze.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.96\linewidth]{figures/large-25x25.plus/patterns.png}
+  \caption{Zbiór \texttt{large plus}: 15 wzorców o rozmiarze $25\times25$ ($n = 625$). Czarny piksel to stan $1$, biały $-1$.}
+  \label{fig:large-25x25.plus:patterns}
+\end{figure}
+
+\subsubsection{Zmodyfikowany zbiór \texttt{large}}
+\label{sec:ds_large_50}
+Zbiór składa się z 6 obrazków, górna połowa obrazków to obrazki ze zbioru \texttt{large} (rozdz.~\ref{sec:ds_large}),
+a dolna to jednolicie czarny kwadrat $25 \times 25$~px (wszystkie stany równe $1$).
+Obrazki są rozmiaru $25 \times 50$~px.
+Rysunek~\ref{fig:large-25x50:patterns} przedstawia obrazki zawarte w zbiorze.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.72\linewidth]{figures/large-25x50/patterns.png}
+  \caption{Zmodyfikowany zbiór \texttt{large}: 6 wzorców o rozmiarze $25\times50$ ($n = 1250$). Czarny piksel to stan $1$, biały $-1$.}
+  \label{fig:large-25x50:patterns}
+\end{figure}
+
+\subsubsection{Zbiór \texttt{letters}}
+\label{sec:ds_letters}
+Zbiór składa się z 26 obrazków przedstawiających małe litery alfabetu.
+Obrazki są rozmiaru $14 \times 20$~px.
+Rysunek~\ref{fig:letters-14x20:patterns} przedstawia obrazki zawarte w zbiorze.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.96\linewidth]{figures/letters-14x20/patterns.png}
+  \caption{Zbiór \texttt{letters}: 26 wzorców o rozmiarze $14\times20$ ($n = 280$). Czarny piksel to stan $1$, biały $-1$.}
+  \label{fig:letters-14x20:patterns}
+\end{figure}
+
+\subsubsection{Zbiór \texttt{letters-abc}}
+\label{sec:ds_letters_abc}
+Zbiór składa się z 3 obrazków przedstawiających 3 pierwsze małe litery alfabetu.
+Litery mają inne kształty niż w zbiorze \texttt{letters} (rozdz.~\ref{sec:ds_letters}).
+Obrazki są rozmiaru $8 \times 12$~px.
+Rysunek~\ref{fig:letters-abc-8x12:patterns} przedstawia obrazki zawarte w zbiorze.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.36\linewidth]{figures/letters-abc-8x12/patterns.png}
+  \caption{Zbiór \texttt{letters-abc}: 3 wzorce o rozmiarze $8\times12$ ($n = 96$). Czarny piksel to stan $1$, biały $-1$.}
+  \label{fig:letters-abc-8x12:patterns}
+\end{figure}
+
+\subsubsection{Zbiór \texttt{OCRA}}
+\label{sec:ds_ocra}
+Zbiór składa się z 7 obrazków przedstawiających wielkie litery alfabetu (A, B, C, K, Q, R, Z).
+Obrazki są rozmiaru $12 \times 30$~px.
+Rysunek~\ref{fig:OCRA-12x30-cut:patterns} przedstawia obrazki zawarte w zbiorze.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.84\linewidth]{figures/OCRA-12x30-cut/patterns.png}
+  \caption{Zbiór \texttt{OCRA}: 7 wzorców o rozmiarze $12\times30$ ($n = 360$). Czarny piksel to stan $1$, biały $-1$.}
+  \label{fig:OCRA-12x30-cut:patterns}
+\end{figure}
+
+\subsubsection{Zbiór \texttt{small}}
+\label{sec:ds_small}
+Zbiór składa się z 5 obrazków przedstawiających proste kształty.
+Obrazki są rozmiaru $7 \times 7$~px.
+Rysunek~\ref{fig:small-7x7:patterns} przedstawia obrazki zawarte w zbiorze.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.60\linewidth]{figures/small-7x7/patterns.png}
+  \caption{Zbiór \texttt{small}: 5 wzorców o rozmiarze $7\times7$ ($n = 49$). Czarny piksel to stan $1$, biały $-1$.}
+  \label{fig:small-7x7:patterns}
+\end{figure}\section{Wyniki}
+\label{sec:wyniki}
+
+\section{Podsumowanie i wnioski}
+
+\begin{thebibliography}{9}
+  \addcontentsline{toc}{section}{Literatura}
+
+\bibitem{hopfield1982}
+J.~J.~Hopfield, \emph{Neural networks and physical systems with emergent collective computational abilities},
+Proceedings of the National Academy of Sciences 79(8), 1982.
+
+\bibitem{bruck1990}
+J.~Bruck, \emph{On the convergence properties of the Hopfield model},
+Proceedings of the IEEE 78(10), 1990.
+
+\end{thebibliography}
+
+\end{document}

@@ -332,7 +332,9 @@ auto run(const Options &opts) -> int {
   }
   *results_file
       << "query,target,status,steps,category,best_pattern,best_overlap,"
-         "target_overlap,hamming_to_target,energy_initial,energy_final\n";
+         "target_overlap_initial,hamming_initial,target_overlap,hamming_to_"
+         "target,"
+         "energy_initial,energy_final\n";
 
   std::map<std::string, std::size_t> categories;
   std::map<std::string, std::size_t> statuses;
@@ -340,6 +342,7 @@ auto run(const Options &opts) -> int {
   std::size_t with_target = 0;
   std::size_t recalled = 0;
   double total_target_overlap = 0.0;
+  double total_initial_overlap = 0.0;
   const auto n_signed = static_cast<long>(n);
 
   for (std::size_t q = 0; q < n_queries; ++q) {
@@ -364,12 +367,16 @@ auto run(const Options &opts) -> int {
     }
 
     const auto target = targets[q];
+    long initial_overlap = 0;
     long target_overlap = 0;
     std::string category;
     if (target >= 0) {
-      target_overlap = linalg::dot(
-          std::as_const(*patterns).row(static_cast<std::size_t>(target)),
-          final_state);
+      const auto source =
+          std::as_const(*patterns).row(static_cast<std::size_t>(target));
+      initial_overlap = linalg::dot(source, input);
+      target_overlap = linalg::dot(source, final_state);
+      total_initial_overlap +=
+          static_cast<double>(initial_overlap) / static_cast<double>(n);
       ++with_target;
       total_target_overlap +=
           static_cast<double>(target_overlap) / static_cast<double>(n);
@@ -394,17 +401,22 @@ auto run(const Options &opts) -> int {
     ++statuses[std::string(status_name(outcome.status))];
     total_steps += outcome.steps;
 
-    const auto hamming =
-        target >= 0 ? std::format("{}", (n_signed - target_overlap) / 2) : "";
-    const auto target_overlap_text =
-        target >= 0 ? std::format("{}", static_cast<double>(target_overlap) /
-                                            static_cast<double>(n))
-                    : "";
+    auto overlap_text = [&](long m) {
+      return target >= 0 ? std::format("{}", static_cast<double>(m) /
+                                                 static_cast<double>(n))
+                         : std::string{};
+    };
+    auto hamming_text = [&](long m) {
+      return target >= 0 ? std::format("{}", (n_signed - m) / 2)
+                         : std::string{};
+    };
     *results_file << std::format(
-        "{},{},{},{},{},{},{},{},{},{},{}\n", q, target,
+        "{},{},{},{},{},{},{},{},{},{},{},{},{}\n", q, target,
         status_name(outcome.status), outcome.steps, category, best,
         static_cast<double>(best_overlap) / static_cast<double>(n),
-        target_overlap_text, hamming, energy_initial, energy_final);
+        overlap_text(initial_overlap), hamming_text(initial_overlap),
+        overlap_text(target_overlap), hamming_text(target_overlap),
+        energy_initial, energy_final);
   }
 
   const auto seconds =
@@ -446,6 +458,10 @@ auto run(const Options &opts) -> int {
       << std::format("  \"recalled\": {},\n", recalled)
       << std::format("  \"recall_rate\": {},\n",
                      with_target > 0 ? static_cast<double>(recalled) /
+                                           static_cast<double>(with_target)
+                                     : 0.0)
+      << std::format("  \"mean_initial_target_overlap\": {},\n",
+                     with_target > 0 ? total_initial_overlap /
                                            static_cast<double>(with_target)
                                      : 0.0)
       << std::format("  \"mean_target_overlap\": {},\n",

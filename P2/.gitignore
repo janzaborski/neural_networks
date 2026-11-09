@@ -23,3 +23,7 @@ __pycache__/
 .vscode/
 *.swp
 .DS_Store
+
+# non source
+*.png
+*.csv
