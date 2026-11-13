@@ -1,21 +1,41 @@
 module;
+
 #include <algorithm>
-#include <cassert>
+#include <cmath>
 #include <concepts>
 #include <cstddef>
+#include <format>
 #include <functional>
+#include <limits>
 #include <mdspan>
 #include <ranges>
 #include <span>
 #include <stdexcept>
+#include <string_view>
 #include <type_traits>
+#include <utility>
 #include <vector>
+
 export module linalg;
+
+namespace linalg {
+
+constexpr auto check(bool condition, const char *function,
+                     std::string_view what) -> void {
+  if (!condition) {
+    throw std::invalid_argument(std::format("linalg::{}: {}", function, what));
+  }
+}
+
+} // namespace linalg
 
 export namespace linalg {
 
 template <typename T>
-concept Scalar = std::floating_point<T> || std::signed_integral<T>;
+concept Scalar = std::is_arithmetic_v<T>;
+
+template <Scalar A, Scalar B>
+using product_t = decltype(std::declval<A>() * std::declval<B>());
 
 using extents = std::dextents<std::size_t, 2>;
 
@@ -23,185 +43,170 @@ template <typename T> using matrix_view = std::mdspan<T, extents>;
 
 template <Scalar T> class Matrix {
 public:
-  constexpr Matrix(std::size_t rows, std::size_t cols, T value = T{});
+  using value_type = T;
+
   constexpr Matrix() = default;
-  constexpr Matrix(extents ext, std::vector<T> data);
 
-  constexpr auto rows() const noexcept -> std::size_t;
-  constexpr auto cols() const noexcept -> std::size_t;
-  constexpr auto size() const noexcept -> std::size_t;
+  constexpr Matrix(std::size_t rows, std::size_t cols, T value = T{})
+      : extents_{rows, cols}, data_(rows * cols, value) {}
+
+  constexpr Matrix(extents shape, std::vector<T> data)
+      : extents_{shape}, data_(std::move(data)) {
+    check(data_.size() == rows() * cols(), "Matrix",
+          "data size does not match the shape");
+  }
+
+  [[nodiscard]] constexpr auto rows() const noexcept -> std::size_t {
+    return extents_.extent(0);
+  }
+  [[nodiscard]] constexpr auto cols() const noexcept -> std::size_t {
+    return extents_.extent(1);
+  }
+
+  template <typename Self> [[nodiscard]] constexpr auto view(this Self &self) {
+    using Element = std::conditional_t<std::is_const_v<Self>, const T, T>;
+    return matrix_view<Element>(self.data_.data(), self.extents_);
+  }
 
   template <typename Self>
-  using element_t = std::conditional_t<std::is_const_v<Self>, const T, T>;
+  [[nodiscard]] constexpr auto row(this Self &self, std::size_t i) {
+    using Element = std::conditional_t<std::is_const_v<Self>, const T, T>;
+    check(i < self.rows(), "Matrix::row", "row index out of range");
+    return std::span<Element>(self.data_.data() + i * self.cols(), self.cols());
+  }
 
-  template <typename Self>
-  constexpr auto view(this Self &self) -> matrix_view<element_t<Self>>;
-
-  template <typename Self>
-  constexpr auto operator[](this Self &self, std::size_t i, std::size_t j)
-      -> element_t<Self> &;
-
-  template <typename Self>
-  constexpr auto data(this Self &self) -> std::span<element_t<Self>>;
-
-  template <typename Self>
-  constexpr auto row(this Self &self, std::size_t i)
-      -> std::span<element_t<Self>>;
-
-  constexpr auto fill(T value) -> void;
-
-  constexpr bool operator==(const Matrix &rhs) const = default;
+  template <typename Self> [[nodiscard]] constexpr auto data(this Self &self) {
+    using Element = std::conditional_t<std::is_const_v<Self>, const T, T>;
+    return std::span<Element>(self.data_);
+  }
 
 private:
-  extents extents_;
+  extents extents_{0, 0};
   std::vector<T> data_;
 };
 
-template <typename T>
-concept scalar_element = Scalar<std::remove_const_t<T>>;
+template <Scalar A, Scalar B>
+[[nodiscard]] constexpr auto dot(std::span<const A> a, std::span<const B> b)
+    -> product_t<A, B> {
+  check(a.size() == b.size(), "dot", "sizes differ");
+  return std::ranges::fold_left(std::views::zip(a, b), product_t<A, B>{},
+                                [](product_t<A, B> acc, const auto &pair) {
+                                  const auto &[x, y] = pair;
+                                  return acc + x * y;
+                                });
+}
 
-template <typename A, typename B>
-using product_t = decltype(std::declval<A>() * std::declval<B>());
-
-template <scalar_element A>
-constexpr auto row_of(matrix_view<A> a, std::size_t i) -> std::span<A>;
-
-template <scalar_element X, scalar_element Y>
-constexpr auto dot(std::span<X> x, std::span<Y> y) -> product_t<X, Y>;
-
-template <scalar_element A, scalar_element X, Scalar Y>
-constexpr auto gemv(matrix_view<A> a, std::span<X> x, std::span<Y> y) -> void;
-
-template <scalar_element A, scalar_element X, Scalar Y>
-constexpr auto gemv_t(matrix_view<A> a, std::span<X> x, std::span<Y> y) -> void;
-
-template <Scalar A, scalar_element X, scalar_element Y>
-constexpr auto rank1_update(matrix_view<A> a, std::type_identity_t<A> alpha,
-                            std::span<X> x, std::span<Y> y) -> void;
-
-template <Scalar A> constexpr auto zero_diagonal(matrix_view<A> a) -> void;
-
-// impls
-
-template <Scalar T>
-constexpr Matrix<T>::Matrix(std::size_t rows, std::size_t cols, T value)
-    : extents_{rows, cols}, data_(rows * cols, value) {}
-
-template <Scalar T>
-constexpr Matrix<T>::Matrix(extents ext, std::vector<T> data)
-    : extents_{ext}, data_{std::move(data)} {
-  if (data_.size() != extents_.extent(0) * extents_.extent(1)) {
-    throw std::invalid_argument("Matrix: data size does not match extents");
+template <Scalar A, Scalar X, Scalar Y>
+constexpr auto gemv(matrix_view<const A> a, std::span<const X> x,
+                    std::span<Y> y) -> void {
+  check(a.extent(1) == x.size() && a.extent(0) == y.size(), "gemv",
+        "shapes differ");
+  for (std::size_t i = 0; i < a.extent(0); ++i) {
+    Y acc{};
+    for (std::size_t j = 0; j < a.extent(1); ++j) {
+      acc += static_cast<Y>(a[i, j] * x[j]);
+    }
+    y[i] = acc;
   }
 }
 
-template <Scalar T>
-constexpr auto Matrix<T>::rows() const noexcept -> std::size_t {
-  return extents_.extent(0);
-}
-
-template <Scalar T>
-constexpr auto Matrix<T>::cols() const noexcept -> std::size_t {
-  return extents_.extent(1);
-}
-
-template <Scalar T>
-constexpr auto Matrix<T>::size() const noexcept -> std::size_t {
-  return rows() * cols();
-}
-
-template <Scalar T>
-template <typename Self>
-constexpr auto Matrix<T>::view(this Self &self)
-    -> matrix_view<element_t<Self>> {
-  return matrix_view<element_t<Self>>(self.data_.data(), self.extents_);
-}
-
-template <Scalar T>
-template <typename Self>
-constexpr auto Matrix<T>::operator[](this Self &self, std::size_t i,
-                                     std::size_t j) -> element_t<Self> & {
-  assert(i < self.rows() && j < self.cols());
-  return self.data_[i * self.cols() + j];
-}
-
-template <Scalar T>
-template <typename Self>
-constexpr auto Matrix<T>::data(this Self &self) -> std::span<element_t<Self>> {
-  return std::span<element_t<Self>>(self.data_);
-}
-
-template <Scalar T>
-template <typename Self>
-constexpr auto Matrix<T>::row(this Self &self, std::size_t i)
-    -> std::span<element_t<Self>> {
-  assert(i < self.rows());
-  return self.data().subspan(i * self.cols(), self.cols());
-}
-
-template <scalar_element A>
-constexpr auto row_of(matrix_view<A> a, std::size_t i) -> std::span<A> {
-  return std::span<A>(a.data_handle() + i * a.stride(0), a.extent(1));
-}
-
-template <Scalar T> constexpr auto Matrix<T>::fill(T value) -> void {
-  std::ranges::fill(data_, value);
-}
-
-template <scalar_element X, scalar_element Y>
-constexpr auto dot(std::span<X> x, std::span<Y> y) -> product_t<X, Y> {
-  return std::ranges::fold_left(
-      std::views::zip_transform(std::multiplies{}, x, y), product_t<X, Y>{},
-      std::plus{});
-}
-
-template <scalar_element A, scalar_element X, Scalar Y>
-constexpr auto gemv(matrix_view<A> a, std::span<X> x, std::span<Y> y) -> void {
-  if (a.extent(1) != x.size() || a.extent(0) != y.size()) {
-    throw std::invalid_argument("gemv: dimension mismatch");
-  }
-
-  for (auto i{0uz}; i < a.extent(0); ++i) {
-    y[i] = static_cast<Y>(dot(row_of(a, i), x));
-  }
-}
-
-template <scalar_element A, scalar_element X, Scalar Y>
-constexpr auto gemv_t(matrix_view<A> a, std::span<X> x, std::span<Y> y)
-    -> void {
-  if (a.extent(0) != x.size() || a.extent(1) != y.size()) {
-    throw std::invalid_argument("gemv_t: dimension mismatch");
-  }
-
+template <Scalar A, Scalar X, Scalar Y>
+constexpr auto gemv_t(matrix_view<const A> a, std::span<const X> x,
+                      std::span<Y> y) -> void {
+  check(a.extent(0) == x.size() && a.extent(1) == y.size(), "gemv_t",
+        "shapes differ");
   std::ranges::fill(y, Y{});
-  for (auto i{0uz}; i < a.extent(0); ++i) {
-    const auto xi = x[i];
-    for (auto [yj, aij] : std::views::zip(y, row_of(a, i))) {
-      yj = static_cast<Y>(yj + aij * xi);
+  for (std::size_t i = 0; i < a.extent(0); ++i) {
+    for (std::size_t j = 0; j < a.extent(1); ++j) {
+      y[j] += static_cast<Y>(a[i, j] * x[i]);
     }
   }
 }
 
-template <Scalar A, scalar_element X, scalar_element Y>
-constexpr auto rank1_update(matrix_view<A> a, std::type_identity_t<A> alpha,
-                            std::span<X> x, std::span<Y> y) -> void {
-  if (a.extent(0) != x.size() || a.extent(1) != y.size()) {
-    throw std::invalid_argument("rank1_update: dimension mismatch");
-  }
-
-  for (auto i{0uz}; i < a.extent(0); ++i) {
-    const auto scale = alpha * x[i];
-    for (auto [aij, yj] : std::views::zip(row_of(a, i), y)) {
-      aij = static_cast<A>(aij + scale * yj);
-    }
+template <Scalar Alpha, Scalar X, Scalar Y>
+constexpr auto axpy(Alpha alpha, std::span<const X> x, std::span<Y> y) -> void {
+  check(x.size() == y.size(), "axpy", "sizes differ");
+  for (auto &&[xi, yi] : std::views::zip(x, y)) {
+    yi += static_cast<Y>(alpha * xi);
   }
 }
 
-template <Scalar A> constexpr auto zero_diagonal(matrix_view<A> a) -> void {
-  const auto n = std::min(a.extent(0), a.extent(1));
-  for (auto i{0uz}; i < n; ++i) {
-    a[i, i] = A{};
+template <Scalar T>
+[[nodiscard]] constexpr auto transpose(matrix_view<const T> a) -> Matrix<T> {
+  Matrix<T> result(a.extent(1), a.extent(0));
+  auto r = result.view();
+  for (std::size_t i = 0; i < a.extent(0); ++i) {
+    for (std::size_t j = 0; j < a.extent(1); ++j) {
+      r[j, i] = a[i, j];
+    }
   }
+  return result;
+}
+
+template <Scalar R, Scalar A, Scalar B>
+[[nodiscard]] constexpr auto matmul(matrix_view<const A> a,
+                                    matrix_view<const B> b) -> Matrix<R> {
+  check(a.extent(1) == b.extent(0), "matmul", "inner dimensions differ");
+  Matrix<R> result(a.extent(0), b.extent(1));
+  auto r = result.view();
+  for (std::size_t i = 0; i < a.extent(0); ++i) {
+    for (std::size_t k = 0; k < a.extent(1); ++k) {
+      const auto aik = static_cast<R>(a[i, k]);
+      for (std::size_t j = 0; j < b.extent(1); ++j) {
+        r[i, j] += aik * static_cast<R>(b[k, j]);
+      }
+    }
+  }
+  return result;
+}
+
+template <std::floating_point T>
+[[nodiscard]] constexpr auto inverse(Matrix<T> a) -> Matrix<T> {
+  const auto n = a.rows();
+  check(a.cols() == n, "inverse", "matrix is not square");
+  Matrix<T> inv(n, n);
+  auto m = a.view();
+  auto r = inv.view();
+  for (std::size_t i = 0; i < n; ++i) {
+    r[i, i] = T{1};
+  }
+
+  const auto scale = std::ranges::fold_left(
+      a.data() | std::views::transform([](T v) { return std::abs(v); }), T{},
+      [](T x, T y) { return std::max(x, y); });
+  const auto tolerance = T{1e-9} * scale;
+
+  for (std::size_t col = 0; col < n; ++col) {
+    auto pivot = col;
+    for (std::size_t i = col + 1; i < n; ++i) {
+      if (std::abs(m[i, col]) > std::abs(m[pivot, col])) {
+        pivot = i;
+      }
+    }
+    if (!(std::abs(m[pivot, col]) > tolerance)) {
+      throw std::domain_error("linalg::inverse: matrix is singular");
+    }
+    if (pivot != col) {
+      std::ranges::swap_ranges(a.row(col), a.row(pivot));
+      std::ranges::swap_ranges(inv.row(col), inv.row(pivot));
+    }
+    const auto d = m[col, col];
+    for (std::size_t j = 0; j < n; ++j) {
+      m[col, j] /= d;
+      r[col, j] /= d;
+    }
+    for (std::size_t i = 0; i < n; ++i) {
+      if (i == col) {
+        continue;
+      }
+      const auto f = m[i, col];
+      for (std::size_t j = 0; j < n; ++j) {
+        m[i, j] -= f * m[col, j];
+        r[i, j] -= f * r[col, j];
+      }
+    }
+  }
+  return inv;
 }
 
 } // namespace linalg

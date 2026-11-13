@@ -1,3 +1,5 @@
+"""Shared paths and helpers for the Hopfield experiment scripts."""
+
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -6,6 +8,8 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data" / "projekt2"
+CUSTOM_DIR = ROOT / "data" / "custom"
+DATA_DIRS = [DATA_DIR, CUSTOM_DIR]
 QUERY_DIR = ROOT / "data" / "queries"
 OUT_DIR = ROOT / "out"
 FIG_DIR = ROOT / "figures"
@@ -33,7 +37,7 @@ class Dataset:
 
 
 def dataset_from_path(path: Path) -> Dataset:
-
+    """Shape is read from the file name: WxH = width x height (e.g. letters-abc-8x12 = 8 columns, 12 rows)."""
     name = path.name.removesuffix(".csv")
     match = SHAPE.search(name)
     if match is None:
@@ -42,7 +46,7 @@ def dataset_from_path(path: Path) -> Dataset:
 
 
 def datasets(names: list[str] | None = None) -> list[Dataset]:
-    found = [dataset_from_path(p) for p in sorted(DATA_DIR.glob("*.csv"))]
+    found = [dataset_from_path(p) for d in DATA_DIRS for p in sorted(d.glob("*.csv"))]
     if names:
         unknown = set(names) - {d.name for d in found}
         if unknown:
@@ -63,9 +67,14 @@ def save_states(path: Path, states: np.ndarray) -> None:
 
 
 def decode_state(encoded: str) -> np.ndarray:
-
+    """trajectory.csv stores a state as a string of 0/1 (1 = +1)."""
     return np.frombuffer(encoded.encode(), dtype=np.uint8).astype(np.int8) * 2 - 97
 
 
 def level_tag(level: float) -> str:
     return f"{level:.2f}"
+
+
+def is_capacity(name: str) -> bool:
+    """Sets of random patterns used to compare stability and recall with theory."""
+    return name.startswith("capacity-")

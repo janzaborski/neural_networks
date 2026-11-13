@@ -1,3 +1,23 @@
+"""Aggregate all runs from out/ and plot them per dataset.
+
+  python scripts/plot_results.py
+
+Writes:
+  out/summary.csv                 one row per run (config + summary.json)
+  figures/stability.csv, .png     stable training patterns per dataset and rule
+  figures/<dataset>/recall_<kind>.png    kind = flip, mix:
+        fraction of damaged inputs that converged exactly to their source pattern
+        (median over seeds, band = min..max), one line per rule and mode
+  figures/<dataset>/overlap_flip.png     mean overlap of the final state with the source pattern
+  figures/<dataset>/steps_flip.png       mean number of steps (sync) / sweeps (async)
+  figures/<dataset>/recall_vs_distance_<rule>_<mode>.png
+        recall as a function of the measured Hamming distance between input and source pattern,
+        one line per kind of damage (all seeds and levels pooled, binned)
+  figures/<dataset>/outcomes_<kind>_<rule>_<mode>.png   where damaged inputs end up
+  figures/<dataset>/outcomes_random.png
+Outcome categories (from results.csv): target, target_inverse, other_pattern, other_inverse, spurious.
+"""
+
 import json
 import os
 
@@ -20,21 +40,16 @@ CATEGORY_LABELS = {
     "other_inverse": "negatyw innego",
     "spurious": "stan fałszywy",
 }
+RULE_LABELS = {"hebb": "Hebb", "pseudoinverse": "pseudoodwrotność"}
 COLORS = dict(zip(CATEGORIES, ["#2a9d8f", "#8ab17d", "#e9c46a", "#f4a261", "#e76f51"]))
-DAMAGE_KINDS = ["flip", "block", "erase", "shift", "mix"]
+DAMAGE_KINDS = ["flip", "mix"]
 KIND_LABELS = {
     "flip": "odwrócenie pikseli",
-    "block": "zaszumiony prostokąt",
-    "erase": "wymazany pas",
-    "shift": "przesunięcie",
-    "mix": "mieszanka z innym",
+    "mix": "mieszanka pikseli",
 }
 LEVEL_LABELS = {
     "flip": "odwrócone piksele [%]",
-    "block": "zaszumiony obszar [%]",
-    "erase": "wymazany obszar [%]",
-    "shift": "przesunięcie [px]",
-    "mix": "kolumny z wzorca źródłowego [%]",
+    "mix": "piksele z wzorca źródłowego [%]",
 }
 
 
@@ -68,6 +83,8 @@ def collect() -> tuple[pd.DataFrame, pd.DataFrame]:
                     "mean_target_overlap",
                     "mean_steps",
                     "seconds",
+                    "nearest_recalled",
+                    "nearest_recall_rate",
                 )
             }
         )
@@ -119,7 +136,13 @@ def line_plot(df: pd.DataFrame, kind: str, metric: str, ylabel: str, path, ylim=
     for (rule, mode), g in sub.groupby(["rule", "mode"]):
         stats = g.groupby("level")[metric].agg(["median", "min", "max"])
         x = level_values(kind, stats.index)
-        (line,) = ax.plot(x, stats["median"], marker="o", ms=3, label=f"{rule}, {mode}")
+        (line,) = ax.plot(
+            x,
+            stats["median"],
+            marker="o",
+            ms=3,
+            label=f"{RULE_LABELS.get(rule, rule)}, {mode}",
+        )
         ax.fill_between(
             x, stats["min"], stats["max"], color=line.get_color(), alpha=0.2
         )
@@ -210,7 +233,12 @@ def stability(df: pd.DataFrame):
     for k, rule in enumerate(rules):
         t = table[table.rule == rule].set_index("dataset").reindex(names)
         x = [i + (k - (len(rules) - 1) / 2) * width for i in range(len(names))]
-        ax.bar(x, t.stable_patterns / t.n_patterns, width=width, label=rule)
+        ax.bar(
+            x,
+            t.stable_patterns / t.n_patterns,
+            width=width,
+            label=RULE_LABELS.get(rule, rule),
+        )
     ax.set_xticks(
         range(len(names)),
         [f"{n}\n({int(p)} wz.)" for n, p in zip(names, counts)],
@@ -226,6 +254,7 @@ def stability(df: pd.DataFrame):
 def main():
     df, per_query = collect()
     print(f"{len(df)} runs -> {(OUT_DIR / 'summary.csv').relative_to(ROOT)}")
+    FIG_DIR.mkdir(exist_ok=True)
     stability(df)
     for name, d in df.groupby("dataset"):
         out = FIG_DIR / name
@@ -255,12 +284,13 @@ def main():
             (-1, 1.02),
         )
         line_plot(d, "flip", "mean_steps", "kroki / przebiegi", out / "steps_flip.png")
-        for special in ("invert", "random"):
-            sub = d[d.kind == special].assign(
-                variant=lambda x: x["rule"] + ", " + x["mode"]
+        sub = d[d.kind == "random"].assign(
+            variant=lambda x: (
+                x["rule"].map(lambda r: RULE_LABELS.get(r, r)) + ", " + x["mode"]
             )
-            if not sub.empty:
-                outcome_bars(sub, "variant", "", out / f"outcomes_{special}.png")
+        )
+        if not sub.empty:
+            outcome_bars(sub, "variant", "", out / "outcomes_random.png")
         if not per_query.empty:
             for (rule, mode), g in per_query[per_query.dataset == name].groupby(
                 ["rule", "mode"]

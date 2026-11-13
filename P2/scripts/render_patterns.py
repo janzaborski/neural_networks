@@ -1,3 +1,18 @@
+"""Pictures of the pattern sets and of damaged inputs.
+
+  python scripts/render_patterns.py
+  python scripts/render_patterns.py --datasets small-7x7 --scale 20
+
+For every data/projekt2/<name>.csv writes into figures/<name>/:
+  patterns.png            all patterns side by side (with index)
+  patterns/pattern_XX.png every pattern as a plain bitmap (scaled, no axes)
+  noise_<kind>.png        pattern 0 damaged with every level of one kind (flip, mix)
+  noise_examples.png      one row per kind: pattern 0 and its damaged versions
+and figures/patterns.tex with two LaTeX figure blocks per dataset, patterns and damage examples
+(\\input it or copy the blocks).
+Convention: +1 = black, -1 = white.
+"""
+
 import argparse
 import math
 import os
@@ -49,14 +64,10 @@ def sheet(
     plt.close(fig)
 
 
-DAMAGE_KINDS = ["flip", "block", "erase", "shift", "mix"]
+DAMAGE_KINDS = ["flip", "mix"]
 KIND_LABELS = {
     "flip": "odwrócenie pikseli",
-    "block": "zaszumiony prostokąt",
-    "erase": "wymazany pas",
-    "shift": "przesunięcie",
-    "mix": "mieszanka z innym",
-    "invert": "negatyw",
+    "mix": "mieszanka pikseli",
 }
 
 
@@ -105,6 +116,8 @@ def render(ds: Dataset, scale: int):
     rng = np.random.default_rng(0)
     rows = []
     for kind in DAMAGE_KINDS:
+        if not make_noise.applicable(kind, len(patterns), ds.name):
+            continue
         levels = make_noise.KINDS[kind]
         states = [patterns[0]] + [
             make_noise.damage(kind, patterns, 0, ds, lv, rng) for lv in levels
@@ -112,9 +125,6 @@ def render(ds: Dataset, scale: int):
         titles = ["oryginał"] + [level_label(kind, lv) for lv in levels]
         sheet(ds, states, titles, out / f"noise_{kind}.png", max_cols=len(states))
         rows.append((KIND_LABELS[kind], states, titles))
-    rows.append(
-        (KIND_LABELS["invert"], [patterns[0], -patterns[0]], ["oryginał", "negatyw"])
-    )
     sheet_rows(ds, rows, out / "noise_examples.png")
     print(f"{ds.name}: {len(patterns)} patterns {ds.width}x{ds.height} -> {out}")
     return len(patterns)

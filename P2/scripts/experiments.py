@@ -1,3 +1,29 @@
+"""Full experiment grid: every dataset x rule x mode x input set x seed.
+
+  cmake --preset release && cmake --build --preset release
+  python scripts/experiments.py --dry-run          # list what would run
+  python scripts/experiments.py                    # run everything missing (parallel)
+  python scripts/experiments.py --datasets small-7x7 --modes async --kinds flip --force
+
+Input sets ("kinds"):
+  patterns  the training patterns themselves (stability, no damage)
+  flip, mix, random
+            damaged / random inputs from make_noise.py (see its --help for the meaning of levels)
+Rules:
+  hebb           W = (X X^T - N I) / n
+  pseudoinverse  W = projection onto the span of the patterns, X (X^T X)^-1 X^T, zero diagonal
+Seeds 0..4 everywhere randomness is involved: the damage and the async update order.
+Synchronous retrieval of undamaged patterns is deterministic, so it runs with seed 0 only.
+Capacity sets (random patterns, capacity-*) run in async mode only.
+
+Every run writes out/<dataset>/<rule>/<mode>/<kind>_<level>/seed<seed>/:
+  config.json   the parameters below (written by this script)
+  summary.json, results.csv, stability.csv   (written by hopfield_app)
+  trajectory.csv  for seed 0 of selected sets (see TRAJECTORY_SETS)
+  weights.csv     for the undamaged sync run (one per dataset and rule, only if n <= MAX_WEIGHTS_N)
+All configs are also collected in configs/grid.json. Finished runs (summary.json present) are skipped.
+"""
+
 import argparse
 import json
 import os
@@ -7,26 +33,23 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from common import DEFAULT_BINARY, OUT_DIR, ROOT, datasets, level_tag
+from common import DEFAULT_BINARY, OUT_DIR, ROOT, datasets, is_capacity, level_tag
 import make_noise
 
-RULES = ["hebb", "oja"]
+RULES = ["hebb", "pseudoinverse"]
 MODES = ["sync", "async"]
 KINDS = ["patterns", *make_noise.KINDS]
-DETERMINISTIC = {"patterns", "invert"}
+DETERMINISTIC = {"patterns"}
 SEEDS = make_noise.SEEDS
 MAX_STEPS = 100
 TRAJECTORY_SETS = {
     ("patterns", 0.0),
     ("flip", 0.10),
     ("flip", 0.30),
-    ("block", 0.30),
-    ("erase", 0.50),
-    ("shift", 2.0),
     ("mix", 0.50),
-    ("invert", 0.0),
     ("random", 0.0),
 }
+MAX_WEIGHTS_N = 2000
 
 
 def levels(kind: str) -> list[float]:
@@ -36,15 +59,19 @@ def levels(kind: str) -> list[float]:
 def build_grid(args) -> list[dict]:
     grid = []
     for ds in datasets(args.datasets):
+        n_patterns = len(ds.load())
         for rule in args.rules:
             for mode in args.modes:
+                if is_capacity(ds.name) and mode != "async":
+                    continue
                 for kind in args.kinds:
+                    if kind != "patterns" and not make_noise.applicable(
+                        kind, n_patterns, ds.name
+                    ):
+                        continue
                     for level in levels(kind):
-                        seeds = (
-                            [0]
-                            if (kind in DETERMINISTIC and mode == "sync")
-                            else SEEDS[: args.seeds]
-                        )
+                        deterministic = kind in DETERMINISTIC and mode == "sync"
+                        seeds = [0] if deterministic else SEEDS[: args.seeds]
                         for seed in seeds:
                             set_name = f"{kind}_{level_tag(level)}"
                             out = (
@@ -69,9 +96,12 @@ def build_grid(args) -> list[dict]:
                                 "max_steps": args.max_steps,
                                 "trajectory": seed == 0
                                 and (kind, level) in TRAJECTORY_SETS,
-                                "weights": kind == "patterns"
-                                and mode == "sync"
-                                and seed == 0,
+                                "weights": (
+                                    kind == "patterns"
+                                    and mode == "sync"
+                                    and seed == 0
+                                    and ds.n <= MAX_WEIGHTS_N
+                                ),
                                 "out": str(out.relative_to(ROOT)),
                             }
                             if kind != "patterns":
@@ -128,13 +158,7 @@ def main():
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     p.add_argument("--datasets", nargs="*")
-    p.add_argument(
-        "--rules",
-        nargs="*",
-        choices=RULES,
-        default=["hebb"],
-        help="default: hebb only (add oja once it is implemented)",
-    )
+    p.add_argument("--rules", nargs="*", choices=RULES, default=RULES)
     p.add_argument("--modes", nargs="*", choices=MODES, default=MODES)
     p.add_argument("--kinds", nargs="*", choices=KINDS, default=KINDS)
     p.add_argument("--seeds", type=int, default=len(SEEDS))

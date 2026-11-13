@@ -24,42 +24,37 @@ namespace {
 auto trim(std::string_view s) -> std::string_view {
   constexpr std::string_view whitespace = " \t\r\n";
   const auto first = s.find_first_not_of(whitespace);
-
   if (first == std::string_view::npos) {
     return {};
   }
-
   const auto last = s.find_last_not_of(whitespace);
   return s.substr(first, last - first + 1);
 }
 
-template <typename Int> auto parse_int(std::string_view s, Int &out) -> bool {
-  const auto *end = s.data() + s.size();
+template <typename Int>
+auto parse_int(std::string_view s, Int& out) -> bool {
+  const auto* end = s.data() + s.size();
   const auto [ptr, ec] = std::from_chars(s.data(), end, out);
   return ec == std::errc{} && ptr == end;
 }
 
-auto read_file(const std::filesystem::path &path)
-    -> std::expected<std::string, std::string> {
+auto read_file(const std::filesystem::path& path) -> std::expected<std::string, std::string> {
   std::ifstream in(path, std::ios::binary);
-
   if (!in) {
     return std::unexpected(std::format("{}: cannot open file", path.string()));
   }
-
   std::ostringstream buffer;
   buffer << in.rdbuf();
-
   return buffer.str();
 }
 
-} // namespace
+}
 
 export namespace io {
 
 using hopfield::State;
 
-auto load_states(const std::filesystem::path &path, std::size_t n_values)
+auto load_states(const std::filesystem::path& path, std::size_t n_values)
     -> std::expected<linalg::Matrix<State>, std::string> {
   auto text = read_file(path);
   if (!text) {
@@ -84,18 +79,16 @@ auto load_states(const std::filesystem::path &path, std::size_t n_values)
       const auto field = trim(std::string_view(part.begin(), part.end()));
       int value = 0;
       if (!parse_int(field, value) || (value != 1 && value != -1)) {
-        return std::unexpected(std::format("{}:{}: value '{}' is not -1 or 1",
-                                           path.string(), line_no,
-                                           std::string(field)));
+        return std::unexpected(std::format("{}:{}: value '{}' is not -1 or 1", path.string(),
+                                           line_no, std::string(field)));
       }
       data.push_back(static_cast<State>(value));
       ++count;
     }
 
     if (count != n_values) {
-      return std::unexpected(std::format("{}:{}: expected {} values, got {}",
-                                         path.string(), line_no, n_values,
-                                         count));
+      return std::unexpected(std::format("{}:{}: expected {} values, got {}", path.string(),
+                                         line_no, n_values, count));
     }
     ++rows;
   }
@@ -103,11 +96,10 @@ auto load_states(const std::filesystem::path &path, std::size_t n_values)
   if (rows == 0) {
     return std::unexpected(std::format("{}: no data rows", path.string()));
   }
-  return linalg::Matrix<State>(linalg::extents{rows, n_values},
-                               std::move(data));
+  return linalg::Matrix<State>(linalg::extents{rows, n_values}, std::move(data));
 }
 
-auto load_targets(const std::filesystem::path &path, std::size_t n_rows)
+auto load_targets(const std::filesystem::path& path, std::size_t n_rows)
     -> std::expected<std::vector<long>, std::string> {
   auto text = read_file(path);
   if (!text) {
@@ -127,26 +119,23 @@ auto load_targets(const std::filesystem::path &path, std::size_t n_rows)
     }
     long value = 0;
     if (!parse_int(content, value) || value < -1) {
-      return std::unexpected(std::format("{}:{}: invalid target '{}'",
-                                         path.string(), line_no,
+      return std::unexpected(std::format("{}:{}: invalid target '{}'", path.string(), line_no,
                                          std::string(content)));
     }
     targets.push_back(value);
   }
 
   if (targets.size() != n_rows) {
-    return std::unexpected(std::format("{}: expected {} targets, got {}",
-                                       path.string(), n_rows, targets.size()));
+    return std::unexpected(std::format("{}: expected {} targets, got {}", path.string(), n_rows,
+                                       targets.size()));
   }
   return targets;
 }
 
-auto open_output(const std::filesystem::path &path)
-    -> std::expected<std::ofstream, std::string> {
+auto open_output(const std::filesystem::path& path) -> std::expected<std::ofstream, std::string> {
   std::ofstream out(path);
   if (!out) {
-    return std::unexpected(
-        std::format("{}: cannot open for writing", path.string()));
+    return std::unexpected(std::format("{}: cannot open for writing", path.string()));
   }
   return out;
 }
@@ -179,8 +168,7 @@ auto json_string(std::string_view s) -> std::string {
       break;
     default:
       if (static_cast<unsigned char>(c) < 0x20) {
-        out += std::format(
-            "\\u{:04x}", static_cast<unsigned>(static_cast<unsigned char>(c)));
+        out += std::format("\\u{:04x}", static_cast<unsigned>(static_cast<unsigned char>(c)));
       } else {
         out += c;
       }
@@ -190,4 +178,4 @@ auto json_string(std::string_view s) -> std::string {
   return out;
 }
 
-} // namespace io
+}

@@ -1,0 +1,67 @@
+{
+  "shapes5-200x300": {
+    "classes": [
+      "comma",
+      "device8",
+      "rat",
+      "pocket",
+      "fish"
+    ],
+    "N": 5,
+    "foreground": 0.361,
+    "mean_abs_overlap": 0.264,
+    "max_abs_overlap": 0.339,
+    "hebb_stable": 2,
+    "gram_condition": 4.5
+  },
+  "shapes10-200x300": {
+    "classes": [
+      "comma",
+      "device8",
+      "rat",
+      "pocket",
+      "fish",
+      "butterfly",
+      "lizzard",
+      "hat",
+      "key",
+      "hcircle"
+    ],
+    "N": 10,
+    "foreground": 0.369,
+    "mean_abs_overlap": 0.304,
+    "max_abs_overlap": 0.439,
+    "hebb_stable": 0,
+    "gram_condition": 11.8
+  },
+  "shapes20-200x300": {
+    "classes": [
+      "comma",
+      "device8",
+      "rat",
+      "pocket",
+      "fish",
+      "butterfly",
+      "lizzard",
+      "hat",
+      "key",
+      "hcircle",
+      "glas",
+      "lmfish",
+      "car",
+      "fountain",
+      "chicken",
+      "bird",
+      "crown",
+      "turtle",
+      "cup",
+      "carriage"
+    ],
+    "N": 20,
+    "foreground": 0.357,
+    "mean_abs_overlap": 0.363,
+    "max_abs_overlap": 0.584,
+    "hebb_stable": 0,
+    "gram_condition": 43.1
+  }
+}

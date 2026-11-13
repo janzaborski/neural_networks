@@ -1,3 +1,14 @@
+"""Convergence of the network step by step, from trajectory.csv of a run.
+
+  python scripts/animate.py out/small-7x7/hebb/async/flip_0.30/seed0
+  python scripts/animate.py out/large-25x25/hebb/sync/patterns_0.00/seed0 --queries 0 3 --fps 2
+
+For each selected query writes into figures/<dataset>/trajectories/:
+  <rule>_<mode>_<set>_seed<s>_q<k>.gif   animation, one frame per step (sync) / sweep (async)
+  <rule>_<mode>_<set>_seed<s>_q<k>.png   the same frames side by side, with step, energy and changed pixels
+Convention: +1 = black, -1 = white. Needs a run made with --trajectory (see experiments.py).
+"""
+
 import argparse
 import json
 import math
@@ -10,11 +21,11 @@ import pandas as pd
 from common import FIG_DIR, ROOT, decode_state
 
 os.environ.setdefault("MPLCONFIGDIR", str(ROOT / ".cache" / "matplotlib"))
-import matplotlib
+import matplotlib  # noqa: E402
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-from PIL import Image, ImageDraw
+import matplotlib.pyplot as plt  # noqa: E402
+from PIL import Image, ImageDraw  # noqa: E402
 
 
 def frame(

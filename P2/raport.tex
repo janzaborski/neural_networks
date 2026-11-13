@@ -20,9 +20,9 @@
 \maketitle
 
 \begin{abstract}
-Zaimplementowaliśmy od podstaw sieć Hopfielda z dwiema regułami uczenia: Hebba i Oji,
+Zaimplementowaliśmy od podstaw sieć Hopfielda z dwiema regułami uczenia: Hebba i pseudoodwrotności,
 oraz dwoma trybami odtwarzania: synchronicznym i asynchronicznym.
-Zbadaliśmy działanie sieci na zbiorach prostych bitmap, mierząc skuteczność metrykami
+Zbadaliśmy działanie sieci na zbiorach bitmap dołączonych do zadania, na wzorcach losowych i na obrazach $200 \times 300$, mierząc skuteczność metrykami
 oraz szczegółowo analizując konkretne przypadki podatne na nieprawidłowe działanie sieci.
 \end{abstract}
 
@@ -56,26 +56,63 @@ a $w_{ii} = 0$ odpowiada temu, że żaden neuron nie jest połączony z samym so
 
 \subsection{Uczenie}
 Pamięć modelu będziemy kodować w wagach między neuronami.
-Rozważamy dwie reguły wyznaczania macierzy $\mathbf{W}$: regułę Hebba (rozdz.~\ref{sec:hebb}) oraz regułę Oji (rozdz.~\ref{sec:oji}).
+Rozważamy dwie reguły wyznaczania macierzy $\mathbf{W}$: regułę Hebba (rozdz.~\ref{sec:hebb}) oraz metodę pseudoodwrotności (rozdz.~\ref{sec:pseudoinv}).
 
-Oznaczamy $\mathbf{X} = \left[\mathbf{x}^{(p)} : p = 1, \ldots, N\right]$ jako zbiór wzorców zapamiętywanych przez sieć,
-gdzie $N$ to liczba wzorców, $\mathbf{x}^{(p)}$ to wektor stanów wzorca o indeksie $p$,
-a $\mathbf{X} \in \{-1,\, 1\}^{N \times n}$ jest macierzą, której kolejne wiersze odpowiadają kolejnym wzorcom (ich wektorom stanów).
+Zbiór wzorców zapamiętywanych przez sieć zapisujemy jako macierz
+$\mathbf{X} = \left[\mathbf{x}^{(1)}, \ldots, \mathbf{x}^{(N)}\right] \in \{-1,\, 1\}^{n \times N}$,
+której $p$-ta kolumna to wzorzec $\mathbf{x}^{(p)}$, a $N$ to liczba wzorców.
 
 \subsubsection{Reguła Hebba}
 \label{sec:hebb}
-Macierz wag obliczamy ze wzoru
+Macierz wag to suma iloczynów zewnętrznych wzorców z wyzerowaną przekątną:
 \[
-  \mathbf{W} = \frac{1}{n}\left(\mathbf{X}^{T}\mathbf{X} - N\mathbf{I}_{n}\right).
+  \mathbf{W} = \frac{1}{n}\left(\mathbf{X}\mathbf{X}^{T} - N\mathbf{I}_{n}\right)
+             = \frac{1}{n}\sum_{p=1}^{N} \mathbf{x}^{(p)}\mathbf{x}^{(p)T} - \frac{N}{n}\mathbf{I}_{n}.
 \]
-Każdy element przekątnej $\mathbf{X}^{T}\mathbf{X}$ jest równy $N$, więc odjęcie $N\mathbf{I}_{n}$ zeruje przekątną.
-Dodatni czynnik $\frac{1}{n}$ nie zmienia znaków pól lokalnych, a zatem nie wpływa na przebieg odtwarzania;
-utrzymuje jedynie wagi i energię w podobnej skali niezależnie od liczby neuronów.
+Waga $w_{ij}$ jest dodatnia, gdy neurony $i$ i $j$ mają we wzorcach przeważnie ten sam stan, a ujemna, gdy przeciwny.
+Pole lokalne stanu $\mathbf{x}$ (rozdz.~\ref{sec:odtwarzanie}) wynosi
+\[
+  \mathbf{W}\mathbf{x} = \frac{1}{n}\mathbf{X}\left(\mathbf{X}^{T}\mathbf{x}\right) - \frac{N}{n}\mathbf{x}
+                       = \sum_{p=1}^{N} m_p(\mathbf{x})\, \mathbf{x}^{(p)} - \frac{N}{n}\mathbf{x},
+\]
+gdzie $m_p(\mathbf{x}) = \frac{1}{n}\mathbf{x}^{(p)T}\mathbf{x} \in [-1,\, 1]$ to \emph{podobieństwo} (ang.\ \emph{overlap}) stanu do wzorca $p$.
+$\mathbf{X}^{T}$ wyznacza podobieństwa do wzorców, a $\mathbf{X}$ składa z nich kombinację wzorców:
+$\frac{1}{n}\mathbf{X}\mathbf{X}^{T}$ rzutuje stan na wzorce, a każdy wzorzec przyciąga stan z siłą swojego podobieństwa.
+Dla wzorca $\mathbf{x}^{(q)}$:
+\[
+  \mathbf{W}\mathbf{x}^{(q)} = \underbrace{\left(1 - \frac{N}{n}\right)\mathbf{x}^{(q)}}_{\text{sygnał}}
+                             + \underbrace{\sum_{p \neq q} m_{pq}\, \mathbf{x}^{(p)}}_{\text{przesłuch}},
+  \qquad m_{pq} = m_p(\mathbf{x}^{(q)}).
+\]
+Wzorzec jest stabilny, gdy na żadnym neuronie przesłuch nie przeważa sygnału.
+Dla wzorców ortogonalnych przesłuchu nie ma, a $\frac{1}{n}\mathbf{X}\mathbf{X}^{T}$ jest rzutem ortogonalnym na ich przestrzeń.
+Dla wzorców losowych $|m_{pq}| \sim 1/\sqrt{n}$, a pojemność sieci wynosi ok.\ $0{,}138\,n$~\cite{amit1985}.
+Wzorce skorelowane (np.\ o wspólnym tle) mają duże $|m_{pq}|$ niezależnie od $n$
+i mogą być niestabilne już przy kilku wzorcach.
 
-\subsubsection{Reguła Oji}
-\label{sec:oji}
+\subsubsection{Metoda pseudoodwrotności}
+\label{sec:pseudoinv}
+Reguła Hebba daje rzut na przestrzeń wzorców tylko dla wzorców ortogonalnych.
+Metoda pseudoodwrotności~\cite{personnaz1985} wyznacza ten rzut dla dowolnych wzorców liniowo niezależnych:
+\[
+  \mathbf{W} = \mathbf{P} - \operatorname{diag}(\mathbf{P}),
+  \qquad
+  \mathbf{P} = \mathbf{X}\left(\mathbf{X}^{T}\mathbf{X}\right)^{-1}\mathbf{X}^{T}.
+\]
+Macierz $\mathbf{X}^{T}\mathbf{X}$ zawiera iloczyny skalarne par wzorców ($n\, m_{pq}$),
+a jej odwrotność usuwa z podobieństw $\mathbf{X}^{T}\mathbf{x}$ wpływ korelacji między wzorcami:
+stan jest rozkładany na składowe wzorców tak, jakby były ortogonalne.
+Dla wzorców ortogonalnych $\mathbf{X}^{T}\mathbf{X} = n\mathbf{I}_{N}$ i metoda sprowadza się do reguły Hebba.
+
+Rzut nie zmienia wzorców ($\mathbf{P}\mathbf{x}^{(p)} = \mathbf{x}^{(p)}$),
+więc po wyzerowaniu przekątnej pole lokalne wzorca wynosi $h_i = (1 - P_{ii})\, x^{(p)}_i$, gdzie $0 \le P_{ii} \le 1$.
+Każdy wzorzec jest zatem stabilny niezależnie od korelacji, w typowym przypadku aż do $N = n - 1$.
+Ceną jest kurczenie się basenów przyciągania wraz ze wzrostem obciążenia $N/n$~\cite{kanter1987}:
+stabilność wzorca nie gwarantuje, że sieć odtworzy go z uszkodzonego wejścia.
+
 
 \subsection{Odtwarzanie wzorca}
+\label{sec:odtwarzanie}
 Rozważamy dwa tryby odtwarzania wzorca: synchroniczny (rozdz.~\ref{sec:sync}) oraz asynchroniczny (rozdz.~\ref{sec:async}).
 Indeks iteracji zapisujemy w indeksie górnym w nawiasach kwadratowych:
 $\mathbf{x}^{[t]}$ oznacza stan sieci po $t$ iteracjach, a $\mathbf{x}^{[0]}$ wzorzec wejściowy
@@ -155,66 +192,62 @@ Sieć zaimplementowano w języku C++ w standardzie C++26, korzystając jedynie z
 Własnoręcznie zaimplementowano model macierzy dwuwymiarowej (i wybrane operacje z algebry liniowej),
 oraz model sieci Hopfielda z API do uczenia sieci oraz generowania kolejnych kroków odtwarzania według wcześniej wspomnianych trybów.
 
+Obie reguły mają postać $\mathbf{W} = \mathbf{X}\mathbf{C}\mathbf{X}^{T} - \mathbf{D}$,
+gdzie $\mathbf{C} = \frac{1}{n}\mathbf{I}_{N}$ (Hebb) lub $\mathbf{C} = (\mathbf{X}^{T}\mathbf{X})^{-1}$ (pseudoodwrotność),
+a $\mathbf{D}$ to macierz przekątna zerująca przekątną $\mathbf{W}$.
+Sieć nie przechowuje więc macierzy $n \times n$, tylko wzorce $\mathbf{X}$, macierz $\mathbf{B} = \mathbf{X}\mathbf{C}$ ($n \times N$)
+i przekątną $\mathbf{D}$, a pola lokalne liczy jako $\mathbf{h} = \mathbf{B}(\mathbf{X}^{T}\mathbf{x}) - \mathbf{D}\mathbf{x}$.
+Daje to pamięć i koszt kroku $O(nN)$ zamiast $O(n^2)$, co dla obrazów $200 \times 300$ ($n = 60\,000$)
+oznacza kilka megabajtów zamiast kilkunastu gigabajtów.
+W trybie asynchronicznym wektor $\mathbf{X}^{T}\mathbf{x}$ jest aktualizowany po każdej zmianie stanu neuronu w czasie $O(N)$.
+Obliczenia wykonujemy w podwójnej precyzji, a $|h_i| \le 10^{-9}$ traktujemy jako $h_i = 0$,
+żeby błędy zaokrągleń nie rozstrzygały remisów.
+
 \section{Procedura eksperymentalna}
 \label{sec:proc}
 
 \subsection{Zbiory danych}
 \label{sec:dane}
-Przebadano działanie sieci, wykorzystując 8 zbiorów danych jako pamięć modelu (tab.~\ref{tab:zbiory}).
+Przebadano działanie sieci na 8 zbiorach dołączonych do zadania (rozdz.~\ref{sec:ds_animals}--\ref{sec:ds_small}),
+na zbiorach dużych obrazów utworzonych ze zbioru MPEG-7 (rozdz.~\ref{sec:ds_shapes})
+oraz na zbiorach wzorców losowych (rozdz.~\ref{sec:ds_capacity}).
+Zbiory przygotowane do konkretnych pytań z zadania opisujemy razem z wynikami (rozdz.~\ref{sec:wyniki}).
 Każdy zbiór to bitmapy o ustalonym rozmiarze $W \times H$ (szerokość $\times$ wysokość),
 spłaszczone wierszami do wektorów stanów o długości $n = WH$;
 piksel czarny odpowiada stanowi $1$, biały stanowi $-1$.
-
-\begin{table}[htbp]
-\centering
-\begin{tabular}{lccc}
-\toprule
-zbiór & rozmiar $W \times H$ & neurony $n$ & wzorce $N$ \\
-\midrule
-\texttt{small-7x7}         & $7 \times 7$   & 49   & 5  \\
-\texttt{letters-abc-8x12}  & $8 \times 12$  & 96   & 3  \\
-\texttt{animals-14x9}      & $14 \times 9$  & 126  & 6  \\
-\texttt{letters-14x20}     & $14 \times 20$ & 280  & 26 \\
-\texttt{OCRA-12x30-cut}    & $12 \times 30$ & 360  & 7  \\
-\texttt{large-25x25}       & $25 \times 25$ & 625  & 6  \\
-\texttt{large-25x25.plus}  & $25 \times 25$ & 625  & 15 \\
-\texttt{large-25x50}       & $25 \times 50$ & 1250 & 6  \\
-\bottomrule
-\end{tabular}
-\caption{Zbiory wzorców zapamiętywanych przez sieć.}
-\label{tab:zbiory}
-\end{table}
+Statystyki zbiorów zestawia rozdz.~\ref{sec:ds_stats}.
 
 Jako wzorce wejściowe do odtwarzania posłużyły zmodyfikowane wzorce z pamięci modelu:
 \begin{itemize}
-    \item \textbf{odwrócenie pikseli} -- $pn$ (po zaokrągleniu do liczby całkowitej) losowo wybranych pikseli
+  \item \textbf{odwrócenie pikseli} -- $pn$ (po zaokrągleniu do liczby całkowitej) losowo wybranych pikseli
         zmienia stan na przeciwny, dla $p$ równego 5, 10, 15, 20, 25, 30, 40 i 50\%;
-  \item \textbf{zaszumiony prostokąt} -- prostokąt o proporcjach obrazu i polu ok.\ $p$ obrazu, w losowym położeniu,
-        zastąpiony losowymi stanami, dla $p$ równego 10, 20, 30, 40 i 50\%;
-  \item \textbf{wymazany pas} -- pas o polu $p$ obrazu przy losowo wybranej krawędzi (górnej, dolnej, lewej lub prawej)
-        ustawiony na $-1$ (tło), dla $p$ równego 25, 50 i 75\%;
-  \item \textbf{przesunięcie} -- obraz przesunięty o 1, 2 lub 3 piksele w losowym kierunku,
-        odsłonięty pas wypełniony stanem $-1$;
-  \item \textbf{mieszanka} -- pierwsze $q$ kolumn pochodzi z wzorca źródłowego, pozostałe z innego, losowo wybranego wzorca
-        tego samego zbioru, dla $q$ równego 50 i 75\%;
-  \item \textbf{negatyw} -- wzorzec o wszystkich stanach przeciwnych, $-\mathbf{x}^{(p)}$.
+  \item \textbf{mieszanka pikseli} -- każdy piksel z prawdopodobieństwem $q$ pochodzi z wzorca źródłowego,
+        a w przeciwnym razie z innego, losowo wybranego wzorca tego samego zbioru, dla $q$ od 10 do 90\% co 10\%;
+  \item \textbf{wejście losowe} -- każdy stan wynosi $1$ lub $-1$ z prawdopodobieństwem $\frac{1}{2}$,
+        niezależnie od wzorców (50 wejść).
 \end{itemize}
-Każdy wzorzec zapamiętany był źródłem 4 uszkodzonych wejść dla każdego rodzaju i poziomu uszkodzenia
-(negatyw: jednego). Dodatkowo do sieci podawano 50 wejść losowych, w których każdy stan wynosi $1$ lub $-1$
-z prawdopodobieństwem $\frac{1}{2}$, niezwiązanych z żadnym wzorcem.
+
+Każdy wzorzec zapamiętany był źródłem 4 zmodyfikowanych wejść dla każdego rodzaju i poziomu modyfikacji.
 Wszystkie wejścia generowano dla 5 ziaren generatora liczb losowych (0--4);
 to samo ziarno wyznacza też kolejność aktualizacji neuronów w trybie asynchronicznym.
-Odtwarzanie synchroniczne wzorców niezmienionych i negatywów jest deterministyczne, więc wykonano je jednokrotnie.
+Odtwarzanie synchroniczne wzorców niezmienionych jest deterministyczne, więc wykonano je jednokrotnie.
 
-Ponieważ sieć Hopfielda ocenia wejście wyłącznie przez liczbę stanów różniących je od wzorców,
-dla każdego wejścia mierzymy też \emph{odległość Hamminga} od wzorca źródłowego, czyli liczbę różniących się stanów.
-Pozwala to porównywać różne rodzaje uszkodzeń na wspólnej skali.
+Dla każdego wejścia zapisujemy stan końcowy i sprawdzamy, czy jest on
+\begin{itemize}
+  \item \textbf{wzorcem źródłowym} -- wzorcem, z którego powstało wejście (\emph{dokładne odtworzenie});
+  \item \textbf{wzorcem najbliższym wejściu} -- wzorcem lub negatywem wzorca o największym $|m_p(\mathbf{x})|$
+        dla wejścia $\mathbf{x}$, czyli najmniejszej odległości Hamminga.
+        Przy wzorcach podobnych do siebie już niewielkie zmiany mogą przybliżyć wejście do innego wzorca niż źródłowy;
+        sieć, która wtedy kończy w tym innym wzorcu, działa poprawnie jako pamięć skojarzeniowa;
+  \item innym wzorcem, negatywem wzorca albo \textbf{stanem fałszywym} -- stanem stabilnym, który nie jest żadnym z nich.
+\end{itemize}
 
 \subsubsection{Zbiór \texttt{animals}}
 \label{sec:ds_animals}
 Zbiór składa się z 6 obrazków przedstawiających uproszczone sylwetki zwierząt.
 Obrazki są rozmiaru $14 \times 9$~px.
 Rysunek~\ref{fig:animals-14x9:patterns} przedstawia obrazki zawarte w zbiorze.
+Rysunek~\ref{fig:animals-14x9:overlaps} przedstawia podobieństwo par wzorców.
 Rysunek~\ref{fig:animals-14x9:noise} przedstawia przykładowe modyfikacje wykorzystywane w eksperymentach.
 Reszta zbiorów korzysta z tych samych modyfikacji, dlatego pominiemy dalsze przykłady.
 
@@ -223,6 +256,13 @@ Reszta zbiorów korzysta z tych samych modyfikacji, dlatego pominiemy dalsze prz
   \includegraphics[width=0.72\linewidth]{figures/animals-14x9/patterns.png}
   \caption{Zbiór \texttt{animals}: 6 wzorców o rozmiarze $14\times9$ ($n = 126$). Czarny piksel to stan $1$, biały $-1$.}
   \label{fig:animals-14x9:patterns}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.45\linewidth]{figures/animals-14x9/overlaps.png}
+  \caption{Podobieństwo $m_{pq}$ par wzorców zbioru \texttt{animals-14x9}.}
+  \label{fig:animals-14x9:overlaps}
 \end{figure}
 
 \begin{figure}[htbp]
@@ -237,6 +277,7 @@ Reszta zbiorów korzysta z tych samych modyfikacji, dlatego pominiemy dalsze prz
 Zbiór składa się z 6 obrazków bez wspólnego motywu.
 Obrazki są rozmiaru $25 \times 25$~px.
 Rysunek~\ref{fig:large-25x25:patterns} przedstawia obrazki zawarte w zbiorze.
+Rysunek~\ref{fig:large-25x25:overlaps} przedstawia podobieństwo par wzorców. Większość par jest słabo podobna, co czyni ten zbiór najłatwiejszym z dołączonych.
 
 \begin{figure}[htbp]
   \centering
@@ -245,11 +286,19 @@ Rysunek~\ref{fig:large-25x25:patterns} przedstawia obrazki zawarte w zbiorze.
   \label{fig:large-25x25:patterns}
 \end{figure}
 
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.45\linewidth]{figures/large-25x25/overlaps.png}
+  \caption{Podobieństwo $m_{pq}$ par wzorców zbioru \texttt{large-25x25}.}
+  \label{fig:large-25x25:overlaps}
+\end{figure}
+
 \subsubsection{Zbiór \texttt{large plus}}
 \label{sec:ds_large_plus}
 Zbiór składa się z 15 obrazków, z czego 6 pochodzi ze zbioru \texttt{large} (rozdz.~\ref{sec:ds_large}).
 Obrazki są tego samego formatu.
 Rysunek~\ref{fig:large-25x25.plus:patterns} przedstawia obrazki zawarte w zbiorze.
+Rysunek~\ref{fig:large-25x25.plus:overlaps} przedstawia podobieństwo par wzorców.
 
 \begin{figure}[htbp]
   \centering
@@ -258,12 +307,20 @@ Rysunek~\ref{fig:large-25x25.plus:patterns} przedstawia obrazki zawarte w zbiorz
   \label{fig:large-25x25.plus:patterns}
 \end{figure}
 
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.45\linewidth]{figures/large-25x25.plus/overlaps.png}
+  \caption{Podobieństwo $m_{pq}$ par wzorców zbioru \texttt{large-25x25.plus}.}
+  \label{fig:large-25x25.plus:overlaps}
+\end{figure}
+
 \subsubsection{Zmodyfikowany zbiór \texttt{large}}
 \label{sec:ds_large_50}
 Zbiór składa się z 6 obrazków, górna połowa obrazków to obrazki ze zbioru \texttt{large} (rozdz.~\ref{sec:ds_large}),
 a dolna to jednolicie czarny kwadrat $25 \times 25$~px (wszystkie stany równe $1$).
 Obrazki są rozmiaru $25 \times 50$~px.
 Rysunek~\ref{fig:large-25x50:patterns} przedstawia obrazki zawarte w zbiorze.
+Rysunek~\ref{fig:large-25x50:overlaps} przedstawia podobieństwo par wzorców. Wspólna czarna połowa sprawia, że podobieństwo każdej pary wynosi $(m_{pq} + 1)/2$, gdzie $m_{pq}$ to podobieństwo odpowiednich obrazków ze zbioru \texttt{large}.
 
 \begin{figure}[htbp]
   \centering
@@ -272,11 +329,19 @@ Rysunek~\ref{fig:large-25x50:patterns} przedstawia obrazki zawarte w zbiorze.
   \label{fig:large-25x50:patterns}
 \end{figure}
 
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.45\linewidth]{figures/large-25x50/overlaps.png}
+  \caption{Podobieństwo $m_{pq}$ par wzorców zbioru \texttt{large-25x50}.}
+  \label{fig:large-25x50:overlaps}
+\end{figure}
+
 \subsubsection{Zbiór \texttt{letters}}
 \label{sec:ds_letters}
 Zbiór składa się z 26 obrazków przedstawiających małe litery alfabetu.
 Obrazki są rozmiaru $14 \times 20$~px.
 Rysunek~\ref{fig:letters-14x20:patterns} przedstawia obrazki zawarte w zbiorze.
+Rysunek~\ref{fig:letters-14x20:overlaps} przedstawia podobieństwo par wzorców. Litery zajmują niewielką część obrazka, więc wszystkie pary są silnie podobne dzięki wspólnemu białemu tłu.
 
 \begin{figure}[htbp]
   \centering
@@ -285,12 +350,20 @@ Rysunek~\ref{fig:letters-14x20:patterns} przedstawia obrazki zawarte w zbiorze.
   \label{fig:letters-14x20:patterns}
 \end{figure}
 
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.45\linewidth]{figures/letters-14x20/overlaps.png}
+  \caption{Podobieństwo $m_{pq}$ par wzorców zbioru \texttt{letters-14x20}.}
+  \label{fig:letters-14x20:overlaps}
+\end{figure}
+
 \subsubsection{Zbiór \texttt{letters-abc}}
 \label{sec:ds_letters_abc}
 Zbiór składa się z 3 obrazków przedstawiających 3 pierwsze małe litery alfabetu.
 Litery mają inne kształty niż w zbiorze \texttt{letters} (rozdz.~\ref{sec:ds_letters}).
 Obrazki są rozmiaru $8 \times 12$~px.
 Rysunek~\ref{fig:letters-abc-8x12:patterns} przedstawia obrazki zawarte w zbiorze.
+Rysunek~\ref{fig:letters-abc-8x12:overlaps} przedstawia podobieństwo par wzorców.
 
 \begin{figure}[htbp]
   \centering
@@ -299,11 +372,19 @@ Rysunek~\ref{fig:letters-abc-8x12:patterns} przedstawia obrazki zawarte w zbiorz
   \label{fig:letters-abc-8x12:patterns}
 \end{figure}
 
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.45\linewidth]{figures/letters-abc-8x12/overlaps.png}
+  \caption{Podobieństwo $m_{pq}$ par wzorców zbioru \texttt{letters-abc-8x12}.}
+  \label{fig:letters-abc-8x12:overlaps}
+\end{figure}
+
 \subsubsection{Zbiór \texttt{OCRA}}
 \label{sec:ds_ocra}
 Zbiór składa się z 7 obrazków przedstawiających wielkie litery alfabetu (A, B, C, K, Q, R, Z).
 Obrazki są rozmiaru $12 \times 30$~px.
 Rysunek~\ref{fig:OCRA-12x30-cut:patterns} przedstawia obrazki zawarte w zbiorze.
+Rysunek~\ref{fig:OCRA-12x30-cut:overlaps} przedstawia podobieństwo par wzorców.
 
 \begin{figure}[htbp]
   \centering
@@ -312,21 +393,444 @@ Rysunek~\ref{fig:OCRA-12x30-cut:patterns} przedstawia obrazki zawarte w zbiorze.
   \label{fig:OCRA-12x30-cut:patterns}
 \end{figure}
 
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.45\linewidth]{figures/OCRA-12x30-cut/overlaps.png}
+  \caption{Podobieństwo $m_{pq}$ par wzorców zbioru \texttt{OCRA-12x30-cut}.}
+  \label{fig:OCRA-12x30-cut:overlaps}
+\end{figure}
+
 \subsubsection{Zbiór \texttt{small}}
 \label{sec:ds_small}
 Zbiór składa się z 5 obrazków przedstawiających proste kształty.
 Obrazki są rozmiaru $7 \times 7$~px.
 Rysunek~\ref{fig:small-7x7:patterns} przedstawia obrazki zawarte w zbiorze.
+Rysunek~\ref{fig:small-7x7:overlaps} przedstawia podobieństwo par wzorców.
 
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.60\linewidth]{figures/small-7x7/patterns.png}
   \caption{Zbiór \texttt{small}: 5 wzorców o rozmiarze $7\times7$ ($n = 49$). Czarny piksel to stan $1$, biały $-1$.}
   \label{fig:small-7x7:patterns}
-\end{figure}\section{Wyniki}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.45\linewidth]{figures/small-7x7/overlaps.png}
+  \caption{Podobieństwo $m_{pq}$ par wzorców zbioru \texttt{small-7x7}.}
+  \label{fig:small-7x7:overlaps}
+\end{figure}
+
+\subsubsection{Zbiory \texttt{shapes} (MPEG-7)}
+\label{sec:ds_shapes}
+Zachowanie sieci na dużych obrazach badamy na sylwetkach ze zbioru MPEG-7 CE-Shape-1 Part B~\cite{latecki2000}.
+Zbiór zawiera 1400 binarnych obrazków w 70 klasach po 20 (zwierzęta, przedmioty, figury) o różnych rozdzielczościach.
+Z każdej klasy bierzemy jeden obrazek (pierwszy) i sprowadzamy go do rozmiaru $200 \times 300$~px ($n = 60\,000$):
+\begin{enumerate}
+  \item binaryzujemy obrazek; tłem jest wartość przeważająca na jego brzegu;
+  \item przycinamy obrazek do prostokąta otaczającego sylwetkę;
+  \item obracamy sylwetkę o $90^\circ$, jeśli jest szersza niż wysoka, żeby lepiej wypełniała pionowy kadr;
+  \item dopełniamy tłem do proporcji $2:3$, z marginesem $5\%$ wymiaru sylwetki;
+  \item skalujemy do $200 \times 300$ (interpolacja dwuliniowa i próg $\frac{1}{2}$).
+\end{enumerate}
+Sylwetka otrzymuje stan $1$, tło $-1$.
+Rysunek~\ref{fig:mpeg7:catalog} przedstawia wszystkie klasy po przekształceniu.
+
+Klasy do zbiorów treningowych wybieramy tak, aby wzorce były jak najmniej podobne.
+Rozważamy tylko klasy, w których sylwetka zajmuje od 25\% do 75\% obrazka:
+dwa niezwiązane obrazki o zbliżonej proporcji czerni i bieli mają mniejsze podobieństwo,
+a obrazki z cienkimi sylwetkami są zdominowane przez wspólne tło.
+Zaczynamy od najmniej podobnej pary, a następnie zachłannie dodajemy klasę,
+której największe podobieństwo do klas już wybranych jest najmniejsze.
+Pierwsze 5, 10 i 20 wybranych klas tworzy zbiory
+\texttt{shapes5}, \texttt{shapes10} i \texttt{shapes20}.
+Rysunki~\ref{fig:shapes20-200x300:patterns} i~\ref{fig:shapes20-200x300:overlaps}
+przedstawiają największy z nich i podobieństwo par jego wzorców.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{figures/mpeg7/catalog.png}
+  \caption{Wszystkie klasy zbioru MPEG-7 po przekształceniu do $200\times300$; liczba pod nazwą to udział sylwetki w obrazku.}
+  \label{fig:mpeg7:catalog}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{figures/shapes20-200x300/patterns.png}
+  \caption{Zbiór \texttt{shapes20}: 20 wzorców o rozmiarze $200\times300$ ($n = 60\,000$).
+           Zbiory \texttt{shapes5} i \texttt{shapes10} to odpowiednio 5 i 10 pierwszych wzorców.}
+  \label{fig:shapes20-200x300:patterns}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.6\linewidth]{figures/shapes20-200x300/overlaps.png}
+  \caption{Podobieństwo $m_{pq}$ par wzorców zbioru \texttt{shapes20}.}
+  \label{fig:shapes20-200x300:overlaps}
+\end{figure}
+
+\subsubsection{Zbiory wzorców losowych}
+\label{sec:ds_capacity}
+Aby porównać zachowanie sieci z teorią dla wzorców losowych, użyliśmy 15 zbiorów wzorców $20 \times 20$ ($n = 400$),
+w których każdy stan wynosi $1$ lub $-1$ z prawdopodobieństwem $\frac{1}{2}$, niezależnie od pozostałych.
+Zbiory różnią się liczbą wzorców: $N$ od 4 do 360, co odpowiada obciążeniu $N/n$ od $0{,}01$ do $0{,}9$
+i obejmuje pojemność reguły Hebba $0{,}138\,n \approx 55$.
+Dla tych zbiorów badamy tylko stabilność i odtwarzanie z wejść z odwróconymi pikselami.
+
+\subsubsection{Statystyki zbiorów}
+\label{sec:ds_stats}
+Tabela~\ref{tab:zbiory} zestawia rozmiary zbiorów, podobieństwa między ich wzorcami
+oraz liczbę wzorców stabilnych przy regule Hebba.
+Obciążenie każdego z dołączonych zbiorów jest wyraźnie poniżej pojemności $0{,}138\,n$ dla wzorców losowych,
+a mimo to w większości z nich reguła Hebba nie utrzymuje wszystkich wzorców.
+Przyczyną jest przesłuch (rozdz.~\ref{sec:hebb}), a nie liczba wzorców:
+najwięcej wzorców zachowuje zbiór o najmniejszym średnim podobieństwie (\texttt{large}),
+a zbiory ze średnim $|m| \gtrsim 0{,}5$ nie mają żadnego stabilnego wzorca.
+Przesłuch sumuje się po wszystkich pozostałych wzorcach,
+dlatego \texttt{large plus} przy podobieństwie zbliżonym do \texttt{large}, ale 15 wzorcach, zachowuje tylko jeden.
+W zbiorach liter podobieństwo wynika z przewagi białego tła (średni stan ok.\ $-0{,}7$),
+a w zmodyfikowanym zbiorze \texttt{large} ze wspólnej czarnej połowy.
+
+\input{figures/pattern_stats.tex}
+
+\section{Wyniki}
 \label{sec:wyniki}
+Jeśli nie zaznaczono inaczej, wyniki dotyczą trybu asynchronicznego i są średnią po 5 ziarnach.
+
+\subsection{Stabilność wzorców zapamiętanych}
+\label{sec:wyniki_stabilnosc}
+
+Tabela~\ref{tab:stabilnosc} pokazuje stabilność wzorców uczących dla obu metod uczenia.
+Reguła Hebba nie radziła sobie z większością zbiorów: spośród dołączonych do zadania najlepiej wypadł \texttt{large} ($5/6$),
+a pełną stabilność ($17/17$) uzyskała tylko na syntetycznym zbiorze \texttt{stable-hebb}, dobranym właśnie pod tym kątem
+(rozdz.~\ref{sec:wyniki_5x5}).
+Pseudoodwrotność uzyskała pełną stabilność na każdym zbiorze, zgodnie z teorią:
+rzut nie zmienia wzorców uczących, więc ich pola lokalne mają znak zgodny ze stanem~\cite{personnaz1985}.
+
+Rysunek~\ref{fig:capacity_stability} pokazuje, że dla wzorców losowych udział stabilnych wzorców przy regule Hebba
+spada zgodnie z przewidywaniem dla normalnego rozkładu przesłuchu (np.\ dla $N = 40$: $75\%$ wobec $76\%$).
+Spadek zaczyna się już przy $N/n \approx 0{,}08$, poniżej pojemności $0{,}138\,n$~\cite{amit1985}:
+pojemność dopuszcza niewielki odsetek błędnych neuronów,
+a dokładna stabilność wszystkich wymaga $N \lesssim n/(2\ln n)$~\cite{mceliece1987}, czyli ok.\ $33$ wzorców dla $n = 400$.
+
+Rysunek~\ref{fig:hebb_overlap} pokazuje, że przy regule Hebba zbiory o mniejszym średnim podobieństwie
+mają więcej stabilnych wzorców.
+Dla wzorców skorelowanych składniki przesłuchu nie znoszą się, tylko sumują w kierunku części wspólnej wzorców,
+przez co minima energii przesuwają się do stanów fałszywych.
+W badanych obrazkach podobieństwo wynika głównie ze wspólnego tła,
+a wzorce o niezerowej średniej aktywności znacząco obniżają pojemność reguły Hebba~\cite{amit1987}.
+Dlatego mimo obciążenia dużo poniżej $0{,}138$ o porażce decyduje korelacja wzorców, a nie ich liczba.
+
+\input{figures/report/stability.tex}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.7\linewidth]{figures/report/capacity_stability.png}
+  \caption{Wzorce losowe ($n = 400$): udział wzorców stabilnych w zależności od obciążenia $N/n$. Linia kropkowana: przewidywanie dla reguły Hebba przy normalnym rozkładzie przesłuchu.}
+  \label{fig:capacity_stability}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.7\linewidth]{figures/report/hebb_stability_vs_overlap.png}
+  \caption{Udział wzorców stabilnych przy regule Hebba w zależności od średniego podobieństwa wzorców zbioru.}
+  \label{fig:hebb_overlap}
+\end{figure}
+
+\subsection{Wpływ wspólnego tła: zbiory \texttt{large} $25 \times 25$ i $25 \times 50$}
+\label{sec:wyniki_large}
+
+Rysunek~\ref{fig:large_vs_50} przedstawia udział dokładnie odtworzonych wzorców w zależności od odsetka odwróconych pikseli.
+Reguła Hebba na zbiorze z doklejoną czarną połową całkowicie przestała odtwarzać wzorce,
+natomiast skuteczność pseudoodwrotności na obu zbiorach jest praktycznie taka sama (ok.\ $100\%$ do $40\%$ odwróconych pikseli).
+Obie reguły przestają odtwarzać wzorce przy $50\%$ odwróconych pikseli,
+bo takie wejście ma w oczekiwaniu zerowe podobieństwo do wszystkich wzorców i nie niesie o nich informacji.
+
+Nieskuteczność reguły Hebba na zmodyfikowanym zbiorze wynika ze wzrostu średniego podobieństwa,
+przez co przesłuch sumuje się w kierunku części wspólnej wzorców i przeważa nad sygnałem.
+Pseudoodwrotność jest na ten efekt niewrażliwa: odwrotność $(\mathbf{X}^{T}\mathbf{X})^{-1}$ usuwa wspólną składową wzorców,
+więc o odtworzeniu decydują tylko różnice między nimi.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.7\linewidth]{figures/report/large_25x25_vs_25x50.png}
+  \caption{Odtwarzanie z wejść z odwróconymi pikselami dla zbiorów \texttt{large} i \texttt{large-25x50}. Linia przerywana: reguła Hebba, ciągła: pseudoodwrotność.}
+  \label{fig:large_vs_50}
+\end{figure}
+
+\subsection{Odtwarzanie z uszkodzonych wejść}
+\label{sec:wyniki_szum}
+
+Zależność udziału dokładnie odtworzonych wzorców od liczności zbioru najlepiej widać na wzorcach losowych (rys.~\ref{fig:capacity_recall}).
+Przy regule Hebba odtwarzanie załamuje się gwałtownie w okolicy pojemności $0{,}138\,n$:
+przy $N = 40$ ($N/n = 0{,}1$) odtwarzane jest ok.\ $73\%$ wejść, a przy $N = 64$ już tylko kilka procent,
+niezależnie od tego, czy odwrócono $10\%$, czy $20\%$ pikseli.
+Pseudoodwrotność odtwarza wszystkie wejścia przy znacznie większym obciążeniu,
+a jej baseny przyciągania kurczą się stopniowo: przy $10\%$ odwróconych pikseli skuteczność spada dopiero przy $N/n = 0{,}5$,
+a przy $20\%$ już przy $N/n = 0{,}35$.
+
+Na zbiorach z zadania (rys.~\ref{fig:recall_flip}) obciążenie jest małe, więc o skuteczności decyduje rodzaj zbioru.
+Pseudoodwrotność odtwarza prawie wszystkie wejścia do $30\%$ odwróconych pikseli na zbiorach o małym podobieństwie wzorców,
+a najsłabiej radzi sobie z literami: dla \texttt{letters} już przy $20\%$ odtwarza tylko $30\%$ wejść.
+Reguła Hebba dokładnie odtwarza wzorce tylko tam, gdzie są one stabilne (\texttt{large}, \texttt{small}, częściowo \texttt{animals}),
+i to tylko te stabilne.
+Mimo to sieć Hebba wyraźnie zbliża stan do wzorca (rys.~\ref{fig:overlap_hebb}).
+Dla \texttt{letters} i \texttt{large-25x50} podobieństwo stanu końcowego nie zależy jednak od poziomu szumu:
+sieć zawsze kończy w tym samym stanie fałszywym, bliskim części wspólnej wzorców.
+
+Słabych wyników liter nie tłumaczy to, że zaszumione wejście jest bliżej innej litery niż źródłowej.
+Odsetek wejść odtworzonych do wzorca najbliższego wejściu (rys.~\ref{fig:nearest_flip}) jest prawie taki sam
+jak odsetek odtworzonych do wzorca źródłowego.
+Różnica pojawia się dopiero przy $50\%$ odwróconych pikseli, gdzie wejście jest praktycznie losowe:
+pseudoodwrotność trafia wtedy w najbliższy wzorzec lub jego negatyw w ok.\ połowie przypadków.
+
+Mieszanki pikseli dwóch wzorców (rys.~\ref{fig:mix_pinv}) pokazują granicę między ich basenami.
+Przy pseudoodwrotności leży ona między $50\%$ a $60\%$ pikseli z wzorca źródłowego,
+a dla liter jest przesunięta: do odtworzenia litery potrzeba ok.\ $70$--$80\%$ jej pikseli.
+Przy regule Hebba (rys.~\ref{fig:mix_hebb}) mieszanki w $87\%$ przypadków kończą się w stanach fałszywych.
+
+W trybie synchronicznym cykle długości 2 są rzadkie (rys.~\ref{fig:cycles}),
+z wyjątkiem liter przy pseudoodwrotności: dla \texttt{letters} cyklem kończy się $46\%$ odtworzeń.
+W trybie asynchronicznym cykle nie występują.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.7\linewidth]{figures/report/capacity_recall.png}
+  \caption{Wzorce losowe ($n = 400$): udział dokładnie odtworzonych wejść z 10\% i 20\% odwróconych pikseli w zależności od obciążenia $N/n$. Linia przerywana: reguła Hebba, ciągła: pseudoodwrotność.}
+  \label{fig:capacity_recall}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}{0.49\linewidth}
+    \includegraphics[width=\linewidth]{figures/report/recall_flip_hebb.png}
+    \caption{reguła Hebba}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.49\linewidth}
+    \includegraphics[width=\linewidth]{figures/report/recall_flip_pseudoinverse.png}
+    \caption{pseudoodwrotność}
+  \end{subfigure}
+  \caption{Zbiory z zadania: udział wejść, z których sieć odtworzyła wzorzec źródłowy, w zależności od odsetka odwróconych pikseli.}
+  \label{fig:recall_flip}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}{0.49\linewidth}
+    \includegraphics[width=\linewidth]{figures/report/nearest_flip_hebb.png}
+    \caption{reguła Hebba}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.49\linewidth}
+    \includegraphics[width=\linewidth]{figures/report/nearest_flip_pseudoinverse.png}
+    \caption{pseudoodwrotność}
+  \end{subfigure}
+  \caption{Zbiory z zadania: udział wejść, z których sieć odtworzyła wzorzec najbliższy wejściu (lub jego negatyw).}
+  \label{fig:nearest_flip}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.7\linewidth]{figures/report/overlap_flip_hebb.png}
+  \caption{Reguła Hebba: średnie podobieństwo stanu końcowego do wzorca źródłowego. Linia kropkowana: podobieństwo wejścia ($1 - 2p$ dla odsetka $p$ odwróconych pikseli).}
+  \label{fig:overlap_hebb}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{figures/report/mix_pseudoinverse.png}
+  \caption{Pseudoodwrotność, mieszanki pikseli dwóch wzorców: udział wejść kończących w wzorcu źródłowym i w innym wzorcu w zależności od udziału $q$ pikseli z wzorca źródłowego.}
+  \label{fig:mix_pinv}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{figures/report/mix_hebb.png}
+  \caption{Reguła Hebba, mieszanki pikseli dwóch wzorców (jak na rys.~\ref{fig:mix_pinv}).}
+  \label{fig:mix_hebb}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.7\linewidth]{figures/report/cycles_sync.png}
+  \caption{Tryb synchroniczny: odsetek odtworzeń zakończonych cyklem długości 2 (wszystkie rodzaje wejść).}
+  \label{fig:cycles}
+\end{figure}
+
+\subsection{Zbiory podobnych i różnorodnych wzorców}
+\label{sec:wyniki_podobne}
+
+Oba zbiory liczą po 6 liter wybranych ze zbioru \texttt{letters}.
+Zbiór podobnych wzorców składa się z dwóch grup po trzy litery o dużym wzajemnym podobieństwie (średnie $|m| = 0{,}86$),
+a zbiór różnorodny z liter wybranych tak, by największe podobieństwo w zbiorze było jak najmniejsze (średnie $|m| = 0{,}57$).
+
+Reguła Hebba nie utrzymuje żadnego wzorca w żadnym z tych zbiorów, więc porównanie dotyczy pseudoodwrotności.
+Zbiór różnorodny jest odtwarzany niemal bezbłędnie do $30\%$ odwróconych pikseli,
+podczas gdy w zbiorze podobnych wzorców skuteczność przy $25\%$ spada do $48\%$, a przy $40\%$ do $14\%$ (rys.~\ref{fig:similar_recall}).
+Podobnie wygląda odtwarzanie z mieszanek: w zbiorze różnorodnym granica basenów jest ostra
+i leży między $50\%$ a $60\%$ pikseli z wzorca źródłowego,
+a w zbiorze podobnych wzorców przejście jest rozmyte i pełne odtworzenie wymaga ok.\ $90\%$ pikseli źródłowych.
+
+Przy tej samej liczności o skuteczności decyduje więc podobieństwo wzorców.
+Pseudoodwrotność zapewnia stabilność wzorców podobnych, ale ich baseny przyciągania są małe,
+bo niewielka zmiana wejścia wystarcza, by stało się ono bliższe innemu wzorcowi z tej samej grupy.
+
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}{0.49\linewidth}
+    \includegraphics[width=\linewidth]{figures/letters-similar-14x20/patterns.png}
+    \caption{podobne}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.49\linewidth}
+    \includegraphics[width=\linewidth]{figures/letters-diverse-14x20/patterns.png}
+    \caption{różnorodne}
+  \end{subfigure}
+  \caption{Zbiory liter o dużym i małym podobieństwie wzorców.}
+  \label{fig:similar_patterns}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{figures/report/similar_vs_diverse.png}
+  \caption{Pseudoodwrotność: odtwarzanie dla zbiorów liter podobnych i różnorodnych z wejść z odwróconymi pikselami i z mieszanek pikseli.}
+  \label{fig:similar_recall}
+\end{figure}
+
+\subsection{Reakcja na wejście losowe}
+\label{sec:wyniki_losowe}
+
+Losowe wejście ma w oczekiwaniu zerowe podobieństwo do wszystkich wzorców,
+więc stan końcowy pokazuje, jakie atraktory dominują w sieci (rys.~\ref{fig:random}).
+Przy regule Hebba wejścia losowe kończą się zwykle w stanach fałszywych: w większości zbiorów w $77$--$100\%$ przypadków.
+Wyjątkiem jest \texttt{small}, gdzie ok.\ $70\%$ wejść trafia we wzorzec lub jego negatyw.
+
+Przy pseudoodwrotności w większości zbiorów od ok.\ połowy do trzech czwartych wejść trafia we wzorzec lub jego negatyw,
+w podobnych proporcjach, co wynika z symetrii $\mathbf{W}(-\mathbf{x}) = -\mathbf{W}\mathbf{x}$.
+Stany fałszywe przeważają na zbiorze \texttt{letters}, gdzie żadne losowe wejście nie trafia we wzorzec,
+oraz na zbiorach silnie obciążonych.
+Sieć nie rozpoznaje więc wejścia jako ,,nieznanego'': zawsze kończy w jakimś stanie stabilnym,
+a dla zbiorów trudnych jest to zwykle stan fałszywy.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{figures/report/random_outcomes.png}
+  \caption{Stany końcowe dla 50 losowych wejść.}
+  \label{fig:random}
+\end{figure}
+
+\subsection{Największy stabilny zbiór wzorców $5 \times 5$}
+\label{sec:wyniki_5x5}
+
+Zbiór dla reguły Hebba wyznaczyliśmy przeszukiwaniem metodą symulowanego wyżarzania:
+dla ustalonej liczby wzorców zmienialiśmy pojedyncze piksele, minimalizując liczbę neuronów, których pole lokalne
+ma znak niezgodny ze stanem, i zwiększaliśmy liczbę wzorców, dopóki udawało się osiągnąć zero.
+Wymagaliśmy ścisłej stabilności ($h_i x_i > 0$) oraz braku powtórzeń i par wzorzec--negatyw,
+które znoszą się w macierzy wag.
+Największy znaleziony zbiór liczy $17$ wzorców (rys.~\ref{fig:stable5x5_patterns}), czyli $0{,}68\,n$,
+znacznie powyżej pojemności dla wzorców losowych.
+Jest to możliwe, bo wzorce są dobrane tak, by były prawie ortogonalne.
+Pełnej ortogonalności nie da się osiągnąć: dla nieparzystego $n = 25$ iloczyn skalarny dwóch wektorów $\pm 1$ jest nieparzysty,
+więc $|m_{pq}| \ge 1/25$.
+Dla $n$ podzielnego przez 4 wiersze macierzy Hadamarda dają $n - 1$ wzorców stabilnych bez żadnego przesłuchu.
+
+Pseudoodwrotność zapewnia stabilność dowolnych wzorców liniowo niezależnych, czyli do $24$ wzorców,
+co potwierdza zbiór $24$ losowych wzorców (tab.~\ref{tab:stabilnosc}).
+
+Stabilność nie przekłada się jednak na odtwarzanie (rys.~\ref{fig:stable5x5_recall}).
+Po odwróceniu jednego piksela zbiór $17$ wzorców jest odtwarzany w $76\%$ przypadków przy regule Hebba
+i w $64\%$ przy pseudoodwrotności, a zbiór $24$ wzorców losowych tylko w $20\%$.
+W trybie synchronicznym dla tych zbiorów $40$--$93\%$ odtworzeń kończy się cyklem.
+Maksymalizacja liczby stabilnych wzorców zmniejsza baseny przyciągania prawie do zera.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figures/stable-hebb-5x5/patterns.png}
+  \caption{Zbiór 17 wzorców $5 \times 5$ stabilnych przy regule Hebba.}
+  \label{fig:stable5x5_patterns}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.7\linewidth]{figures/report/stable_5x5.png}
+  \caption{Odtwarzanie z wejść z odwróconymi pikselami dla zbiorów $5 \times 5$. Linia przerywana: reguła Hebba, ciągła: pseudoodwrotność.}
+  \label{fig:stable5x5_recall}
+\end{figure}
+
+\subsection{Oscylacja w trybie synchronicznym}
+\label{sec:wyniki_oscylacja}
+
+Najprostszy przykład oscylacji otrzymujemy dla jednego wzorca $\boldsymbol{\xi}$ ($4 \times 4$, $n = 16$)
+i wejścia $\mathbf{x}$ ortogonalnego do niego, tj.\ z połową pikseli odwróconą względem $\boldsymbol{\xi}$.
+Reguła Hebba daje wtedy $\mathbf{W} = \frac{1}{n}(\boldsymbol{\xi}\boldsymbol{\xi}^{T} - \mathbf{I})$, a pole lokalne
+\[
+  \mathbf{W}\mathbf{x} = \frac{1}{n}\boldsymbol{\xi}\,(\boldsymbol{\xi}^{T}\mathbf{x}) - \frac{1}{n}\mathbf{x} = -\frac{1}{n}\mathbf{x}
+\]
+ma na każdym neuronie znak przeciwny do stanu.
+W trybie synchronicznym wszystkie neurony zmieniają się naraz, więc sieć przechodzi z $\mathbf{x}$ do $-\mathbf{x}$
+i z powrotem (rys.~\ref{fig:oscillation}).
+Oba stany mają tę samą energię, bo $E(-\mathbf{x}) = E(\mathbf{x})$.
+Pseudoodwrotność daje dla jednego wzorca tę samą macierz wag, więc oscylacja występuje przy obu regułach.
+
+W trybie asynchronicznym ta sama sieć zawsze zbiega:
+pierwsza zmiana pojedynczego neuronu narusza ortogonalność wejścia,
+a dalsze zmiany prowadzą do $\boldsymbol{\xi}$ lub $-\boldsymbol{\xi}$.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.6\linewidth]{figures/oscillation-4x4/trajectories/hebb_sync_oscillation_0.00_seed0_q0.png}
+  \caption{Oscylacja w trybie synchronicznym: kolejne stany sieci dla wejścia ortogonalnego do jedynego wzorca.}
+  \label{fig:oscillation}
+\end{figure}
+
+\subsection{Duże obrazy}
+\label{sec:wyniki_duze}
+
+Na zbiorach \texttt{shapes} ($n = 60\,000$) pseudoodwrotność odtwarza wszystkie wejścia do $40\%$ odwróconych pikseli,
+niezależnie od liczby wzorców (5, 10 i 20), a przy $50\%$ nie odtwarza żadnego (rys.~\ref{fig:shapes_recall}).
+Obciążenie tych zbiorów jest pomijalne ($N/n \le 0{,}0003$), więc o wyniku decyduje wyłącznie podobieństwo wzorców,
+które dzięki doborowi klas jest umiarkowane.
+
+Reguła Hebba utrzymuje tylko 2 z 5 wzorców zbioru \texttt{shapes5} i odtwarza je z dowolnego wejścia z co najwyżej $40\%$ odwróconych pikseli,
+co daje stały udział odtworzonych wejść równy $40\%$.
+Pozostałe wejścia kończą w stanach fałszywych, podobnie jak wszystkie wejścia w zbiorach \texttt{shapes10} i \texttt{shapes20}.
+Duży rozmiar obrazów nie pomaga więc regule Hebba: przesłuch zależy od podobieństwa wzorców, a nie od ich rozmiaru.
+Rysunek~\ref{fig:shapes_trajectory} pokazuje przykładowe odtwarzanie z $30\%$ odwróconych pikseli dla obu reguł.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{figures/report/shapes.png}
+  \caption{Zbiory \texttt{shapes}: odtwarzanie z wejść z odwróconymi pikselami i z mieszanek pikseli. Linia przerywana: reguła Hebba, ciągła: pseudoodwrotność.}
+  \label{fig:shapes_recall}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}{\linewidth}
+    \includegraphics[width=\linewidth]{figures/shapes10-200x300/trajectories/hebb_async_flip_0.30_seed0_q0.png}
+    \caption{reguła Hebba}
+  \end{subfigure}
+  \begin{subfigure}{\linewidth}
+    \includegraphics[width=\linewidth]{figures/shapes10-200x300/trajectories/pseudoinverse_async_flip_0.30_seed0_q0.png}
+    \caption{pseudoodwrotność}
+  \end{subfigure}
+  \caption{Zbiór \texttt{shapes10}: odtwarzanie wzorca 0 z wejścia z 30\% odwróconych pikseli.}
+  \label{fig:shapes_trajectory}
+\end{figure}
 
 \section{Podsumowanie i wnioski}
+\begin{itemize}
+  \item Reguła Hebba działa dobrze tylko dla wzorców słabo skorelowanych i przy małym obciążeniu.
+        Dla wzorców losowych jej stabilność i skuteczność odtwarzania załamują się zgodnie z teorią,
+        w okolicy $0{,}138\,n$~\cite{amit1985}.
+  \item Wzorce w zbiorach dołączonych do zadania są niestabilne przy regule Hebba mimo małego obciążenia.
+        Przyczyną jest ich korelacja, głównie wspólne tło, a nie liczba wzorców.
+  \item Pseudoodwrotność zapewnia stabilność każdego zbioru wzorców liniowo niezależnych, niezależnie od ich korelacji.
+  \item Stabilność nie oznacza skutecznego odtwarzania: baseny przyciągania kurczą się wraz z obciążeniem i podobieństwem wzorców.
+  \item Tryb asynchroniczny zawsze zbiega, a synchroniczny może kończyć się cyklem długości 2,
+        najczęściej przy dużym obciążeniu i silnie skorelowanych wzorcach.
+\end{itemize}
 
 \begin{thebibliography}{9}
   \addcontentsline{toc}{section}{Literatura}
@@ -338,6 +842,30 @@ Proceedings of the National Academy of Sciences 79(8), 1982.
 \bibitem{bruck1990}
 J.~Bruck, \emph{On the convergence properties of the Hopfield model},
 Proceedings of the IEEE 78(10), 1990.
+
+\bibitem{amit1985}
+D.~J.~Amit, H.~Gutfreund, H.~Sompolinsky, \emph{Storing infinite numbers of patterns in a spin-glass model of neural networks},
+Physical Review Letters 55(14), 1985.
+
+\bibitem{personnaz1985}
+L.~Personnaz, I.~Guyon, G.~Dreyfus, \emph{Information storage and retrieval in spin-glass like neural networks},
+Journal de Physique Lettres 46(8), 1985.
+
+\bibitem{kanter1987}
+I.~Kanter, H.~Sompolinsky, \emph{Associative recall of memory without errors},
+Physical Review A 35(1), 1987.
+
+\bibitem{latecki2000}
+L.~J.~Latecki, R.~Lakämper, U.~Eckhardt, \emph{Shape descriptors for non-rigid shapes with a single closed contour},
+IEEE Conference on Computer Vision and Pattern Recognition (CVPR), 2000.
+
+\bibitem{mceliece1987}
+R.~J.~McEliece, E.~C.~Posner, E.~R.~Rodemich, S.~S.~Venkatesh, \emph{The capacity of the Hopfield associative memory},
+IEEE Transactions on Information Theory 33(4), 1987.
+
+\bibitem{amit1987}
+D.~J.~Amit, H.~Gutfreund, H.~Sompolinsky, \emph{Information storage in neural networks with low levels of activity},
+Physical Review A 35(5), 1987.
 
 \end{thebibliography}
 

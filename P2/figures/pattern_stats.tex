@@ -1,0 +1,27 @@
+\begin{table}[htbp]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lrrrrrrr}
+\toprule
+zbiór & $N$ & $n$ & $N/n$ & śr.\ stan & śr.\ $|m|$ & maks.\ $|m|$ & stabilne \\
+\midrule
+\texttt{large-25x25} & 6 & 625 & $0{,}0096$ & $-0{,}37$ & $0{,}14$ & $0{,}47$ & 5/6 \\
+\texttt{large-25x25.plus} & 15 & 625 & $0{,}024$ & $-0{,}40$ & $0{,}17$ & $0{,}50$ & 1/15 \\
+\texttt{animals-14x9} & 6 & 126 & $0{,}048$ & $-0{,}38$ & $0{,}21$ & $0{,}38$ & 2/6 \\
+\texttt{shapes5-200x300} & 5 & 60000 & $8{,}3e-05$ & $-0{,}28$ & $0{,}26$ & $0{,}34$ & 2/5 \\
+\texttt{OCRA-12x30-cut} & 7 & 360 & $0{,}019$ & $-0{,}28$ & $0{,}27$ & $0{,}48$ & 1/7 \\
+\texttt{small-7x7} & 5 & 49 & $0{,}1$ & $-0{,}17$ & $0{,}29$ & $0{,}51$ & 3/5 \\
+\texttt{shapes10-200x300} & 10 & 60000 & $0{,}00017$ & $-0{,}26$ & $0{,}30$ & $0{,}44$ & 0/10 \\
+\texttt{shapes20-200x300} & 20 & 60000 & $0{,}00033$ & $-0{,}29$ & $0{,}36$ & $0{,}58$ & 0/20 \\
+\texttt{large-25x50} & 6 & 1250 & $0{,}0048$ & $+0{,}32$ & $0{,}57$ & $0{,}73$ & 0/6 \\
+\texttt{letters-14x20} & 26 & 280 & $0{,}093$ & $-0{,}71$ & $0{,}73$ & $0{,}99$ & 0/26 \\
+\texttt{letters-abc-8x12} & 3 & 96 & $0{,}031$ & $-0{,}76$ & $0{,}81$ & $0{,}83$ & 0/3 \\
+\bottomrule
+\end{tabular}
+\caption{Zbiory wzorców zapamiętywanych przez sieć, uporządkowane według średniego podobieństwa.
+ $N$ -- liczba wzorców, $n$ -- liczba neuronów, $N/n$ -- obciążenie sieci,
+ śr.\ stan -- przewaga czerni, śr.\ $|m|$ -- średnie podobieństwo,
+ maks.\ $|m|$ -- największe podobieństwo, stabilne -- stabilne wzorce (reguła Hebba).}
+\label{tab:zbiory}
+\end{table}

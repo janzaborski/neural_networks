@@ -1,9 +1,9 @@
-#include <charconv>
+#include <algorithm>
 #include <chrono>
-#include <coroutine>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <exception>
 #include <expected>
 #include <filesystem>
 #include <format>
@@ -14,8 +14,10 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <charconv>
 #include <utility>
 #include <vector>
+#include <coroutine>
 
 import hopfield;
 import io;
@@ -23,11 +25,10 @@ import io;
 namespace {
 
 using hopfield::State;
-using Weight = float;
+using Weight = double;
 using Network = hopfield::HopfieldNetwork<Weight>;
 
-constexpr std::string_view usage =
-    R"(usage: hopfield_app --patterns FILE --width W --height H --out DIR [options]
+constexpr std::string_view usage = R"(usage: hopfield_app --patterns FILE --width W --height H --out DIR [options]
 
 required:
   --patterns FILE    training patterns: CSV, one pattern per line, values -1/1
@@ -39,7 +40,7 @@ options:
   --queries FILE     inputs to retrieve from (same format); default: the patterns
   --targets FILE     expected pattern index per query line (-1 = none);
                      default: 0..p-1 when queries are the patterns, otherwise -1
-  --rule NAME        hebb | oja                (default hebb)
+  --rule NAME        hebb | pseudoinverse      (default hebb)
   --mode NAME        sync | async              (default async)
   --max-steps N      steps (sync) or sweeps (async) per query (default 100)
   --seed S           RNG seed for the async update order (default 0)
@@ -62,11 +63,10 @@ struct Options {
   bool weights = false;
 };
 
-template <typename Int>
-auto parse_number(std::string_view name, std::string_view text)
-    -> std::expected<Int, std::string> {
-  Int value{};
-  const auto *end = text.data() + text.size();
+template <typename Number>
+auto parse_number(std::string_view name, std::string_view text) -> std::expected<Number, std::string> {
+  Number value{};
+  const auto* end = text.data() + text.size();
   const auto [ptr, ec] = std::from_chars(text.data(), end, value);
   if (ec != std::errc{} || ptr != end) {
     return std::unexpected(std::format("{}: invalid number '{}'", name, text));
@@ -74,7 +74,7 @@ auto parse_number(std::string_view name, std::string_view text)
   return value;
 }
 
-auto parse_args(int argc, char **argv) -> std::expected<Options, std::string> {
+auto parse_args(int argc, char** argv) -> std::expected<Options, std::string> {
   Options opts;
   bool has_width = false;
   bool has_height = false;
@@ -112,25 +112,21 @@ auto parse_args(int argc, char **argv) -> std::expected<Options, std::string> {
       opts.mode = value;
     } else if (arg == "--width") {
       auto n = parse_number<std::size_t>(arg, value);
-      if (!n)
-        return std::unexpected(n.error());
+      if (!n) return std::unexpected(n.error());
       opts.width = *n;
       has_width = true;
     } else if (arg == "--height") {
       auto n = parse_number<std::size_t>(arg, value);
-      if (!n)
-        return std::unexpected(n.error());
+      if (!n) return std::unexpected(n.error());
       opts.height = *n;
       has_height = true;
     } else if (arg == "--max-steps") {
       auto n = parse_number<std::size_t>(arg, value);
-      if (!n)
-        return std::unexpected(n.error());
+      if (!n) return std::unexpected(n.error());
       opts.max_steps = *n;
     } else if (arg == "--seed") {
       auto n = parse_number<std::uint64_t>(arg, value);
-      if (!n)
-        return std::unexpected(n.error());
+      if (!n) return std::unexpected(n.error());
       opts.seed = *n;
     } else {
       return std::unexpected(std::format("unknown option {}", arg));
@@ -138,13 +134,12 @@ auto parse_args(int argc, char **argv) -> std::expected<Options, std::string> {
   }
 
   if (opts.patterns.empty() || opts.out.empty() || !has_width || !has_height) {
-    return std::unexpected(
-        "--patterns, --width, --height and --out are required");
+    return std::unexpected("--patterns, --width, --height and --out are required");
   }
   if (opts.width == 0 || opts.height == 0) {
     return std::unexpected("--width and --height must be positive");
   }
-  if (opts.rule != "hebb" && opts.rule != "oja") {
+  if (opts.rule != "hebb" && opts.rule != "pseudoinverse") {
     return std::unexpected(std::format("--rule: unknown rule '{}'", opts.rule));
   }
   if (opts.mode != "sync" && opts.mode != "async") {
@@ -170,25 +165,21 @@ auto status_name(hopfield::Status status) -> std::string_view {
   return "unknown";
 }
 
-auto local_field(const Network &net, std::span<const State> s,
-                 std::vector<Weight> &h) -> void {
-  linalg::gemv(net.weights(), s, std::span<Weight>(h));
+auto local_field(const Network& net, std::span<const State> s, std::vector<Weight>& h) -> void {
+  net.local_field(s, std::span<Weight>(h));
 }
 
-auto energy(const Network &net, std::span<const State> s,
-            std::vector<Weight> &h) -> double {
+auto energy(const Network& net, std::span<const State> s, std::vector<Weight>& h) -> double {
   local_field(net, s, h);
   return -0.5 * static_cast<double>(linalg::dot(std::span<const Weight>(h), s));
 }
 
-auto unstable_neurons(const Network &net, std::span<const State> s,
-                      std::vector<Weight> &h) -> std::size_t {
+auto unstable_neurons(const Network& net, std::span<const State> s, std::vector<Weight>& h)
+    -> std::size_t {
   local_field(net, s, h);
   std::size_t count = 0;
   for (std::size_t i = 0; i < s.size(); ++i) {
-    if ((h[i] < Weight{} && s[i] > 0) || (h[i] > Weight{} && s[i] < 0)) {
-      ++count;
-    }
+    count += hopfield::next_state(h[i], s[i]) != s[i];
   }
   return count;
 }
@@ -199,18 +190,16 @@ struct Outcome {
   std::size_t steps = 0;
 };
 
-auto run_query(const Network &net, hopfield::Simulation mode,
-               std::vector<State> state, std::size_t max_steps,
-               std::uint64_t seed, std::size_t query, std::ofstream *trajectory,
-               std::vector<Weight> &h) -> Outcome {
+auto run_query(const Network& net, hopfield::Simulation mode, std::vector<State> state,
+               std::size_t max_steps, std::uint64_t seed, std::size_t query,
+               std::ofstream* trajectory, std::vector<Weight>& h) -> Outcome {
   Outcome outcome;
-  auto consume = [&](auto &&steps) {
-    for (const auto &step : steps) {
+  auto consume = [&](auto&& steps) {
+    for (const auto& step : steps) {
       if (trajectory != nullptr) {
         *trajectory << std::format("{},{},{},{},{},{}\n", query, step.index,
                                    status_name(step.status), step.changed,
-                                   energy(net, step.state, h),
-                                   io::encode_state(step.state));
+                                   energy(net, step.state, h), io::encode_state(step.state));
       }
       outcome.status = step.status;
       outcome.steps = step.index;
@@ -226,7 +215,7 @@ auto run_query(const Network &net, hopfield::Simulation mode,
   return outcome;
 }
 
-auto run(const Options &opts) -> int {
+auto run(const Options& opts) -> int {
   const auto start = std::chrono::steady_clock::now();
   const auto n = opts.width * opts.height;
 
@@ -237,8 +226,7 @@ auto run(const Options &opts) -> int {
   }
   const auto n_patterns = patterns->rows();
 
-  auto queries = opts.queries ? io::load_states(*opts.queries, n)
-                              : io::load_states(opts.patterns, n);
+  auto queries = opts.queries ? io::load_states(*opts.queries, n) : io::load_states(opts.patterns, n);
   if (!queries) {
     std::cerr << "error: " << queries.error() << '\n';
     return 1;
@@ -260,25 +248,33 @@ auto run(const Options &opts) -> int {
   }
   for (const auto t : targets) {
     if (t >= static_cast<long>(n_patterns)) {
-      std::cerr << std::format("error: target {} out of range (patterns: {})\n",
-                               t, n_patterns);
+      std::cerr << std::format("error: target {} out of range (patterns: {})\n", t, n_patterns);
       return 1;
     }
   }
 
-  if (opts.rule == "oja") {
-    std::cerr << "error: the Oja rule is not implemented yet\n";
+  const auto train_start = std::chrono::steady_clock::now();
+  std::optional<Network> trained;
+  try {
+    const auto view = std::as_const(*patterns).view();
+    if (opts.rule == "pseudoinverse") {
+      trained.emplace(hopfield::pseudoinverse<Weight>(view));
+    } else {
+      trained.emplace(hopfield::hebb<Weight>(view));
+    }
+  } catch (const std::exception& e) {
+    std::cerr << "error: training failed: " << e.what() << '\n';
     return 1;
   }
-  const Network net{hopfield::hebb<Weight>(std::as_const(*patterns).view())};
-  const auto mode = opts.mode == "sync" ? hopfield::Simulation::sync
-                                        : hopfield::Simulation::async;
+  const Network& net = *trained;
+  const auto train_seconds =
+      std::chrono::duration<double>(std::chrono::steady_clock::now() - train_start).count();
+  const auto mode = opts.mode == "sync" ? hopfield::Simulation::sync : hopfield::Simulation::async;
 
   std::error_code ec;
   std::filesystem::create_directories(opts.out, ec);
   if (ec) {
-    std::cerr << std::format("error: {}: {}\n", opts.out.string(),
-                             ec.message());
+    std::cerr << std::format("error: {}: {}\n", opts.out.string(), ec.message());
     return 1;
   }
 
@@ -292,11 +288,9 @@ auto run(const Options &opts) -> int {
   *stability_file << "pattern,unstable_neurons,stable\n";
   std::size_t stable_patterns = 0;
   for (std::size_t mu = 0; mu < n_patterns; ++mu) {
-    const auto unstable =
-        unstable_neurons(net, std::as_const(*patterns).row(mu), h);
+    const auto unstable = unstable_neurons(net, std::as_const(*patterns).row(mu), h);
     stable_patterns += unstable == 0;
-    *stability_file << std::format("{},{},{}\n", mu, unstable,
-                                   unstable == 0 ? 1 : 0);
+    *stability_file << std::format("{},{},{}\n", mu, unstable, unstable == 0 ? 1 : 0);
   }
 
   if (opts.weights) {
@@ -305,7 +299,8 @@ auto run(const Options &opts) -> int {
       std::cerr << "error: " << weights_file.error() << '\n';
       return 1;
     }
-    const auto w = net.weights();
+    const auto dense = net.weights();
+    const auto w = dense.view();
     for (std::size_t i = 0; i < w.extent(0); ++i) {
       for (std::size_t j = 0; j < w.extent(1); ++j) {
         *weights_file << (j == 0 ? "" : ",") << std::format("{}", w[i, j]);
@@ -330,17 +325,16 @@ auto run(const Options &opts) -> int {
     std::cerr << "error: " << results_file.error() << '\n';
     return 1;
   }
-  *results_file
-      << "query,target,status,steps,category,best_pattern,best_overlap,"
-         "target_overlap_initial,hamming_initial,target_overlap,hamming_to_"
-         "target,"
-         "energy_initial,energy_final\n";
+  *results_file << "query,target,status,steps,category,best_pattern,best_overlap,"
+                   "target_overlap_initial,hamming_initial,target_overlap,hamming_to_target,"
+                   "energy_initial,energy_final,nearest_initial,nearest_overlap_initial,nearest_recalled\n";
 
   std::map<std::string, std::size_t> categories;
   std::map<std::string, std::size_t> statuses;
   std::size_t total_steps = 0;
   std::size_t with_target = 0;
   std::size_t recalled = 0;
+  std::size_t nearest_recalled = 0;
   double total_target_overlap = 0.0;
   double total_initial_overlap = 0.0;
   const auto n_signed = static_cast<long>(n);
@@ -350,36 +344,48 @@ auto run(const Options &opts) -> int {
     const auto energy_initial = energy(net, input, h);
     const auto seed = opts.seed * 0x9E3779B97F4A7C15ULL + q;
 
-    auto outcome = run_query(
-        net, mode, std::vector<State>(input.begin(), input.end()),
-        opts.max_steps, seed, q, trajectory ? &*trajectory : nullptr, h);
+    auto outcome = run_query(net, mode, std::vector<State>(input.begin(), input.end()),
+                             opts.max_steps, seed, q, trajectory ? &*trajectory : nullptr, h);
     const std::span<const State> final_state(outcome.final_state);
     const auto energy_final = energy(net, final_state, h);
 
     std::size_t best = 0;
     long best_overlap = 0;
+    std::vector<long> final_overlaps(n_patterns);
+    std::vector<long> initial_overlaps(n_patterns);
     for (std::size_t mu = 0; mu < n_patterns; ++mu) {
-      const long m = linalg::dot(std::as_const(*patterns).row(mu), final_state);
-      if (std::abs(m) > std::abs(best_overlap)) {
+      const auto pattern = std::as_const(*patterns).row(mu);
+      final_overlaps[mu] = linalg::dot(pattern, final_state);
+      initial_overlaps[mu] = linalg::dot(pattern, input);
+      if (std::abs(final_overlaps[mu]) > std::abs(best_overlap)) {
         best = mu;
-        best_overlap = m;
+        best_overlap = final_overlaps[mu];
       }
     }
+
+    const auto nearest_it = std::ranges::max_element(initial_overlaps, {}, [](long m) { return std::abs(m); });
+    const auto nearest = static_cast<std::size_t>(nearest_it - initial_overlaps.begin());
+    const long nearest_distance = std::abs(*nearest_it);
+    bool reached_nearest = false;
+    for (std::size_t mu = 0; mu < n_patterns; ++mu) {
+      if (std::abs(initial_overlaps[mu]) == nearest_distance) {
+        const long sign = initial_overlaps[mu] >= 0 ? 1 : -1;
+        reached_nearest = reached_nearest || final_overlaps[mu] == sign * n_signed;
+      }
+    }
+    nearest_recalled += reached_nearest;
 
     const auto target = targets[q];
     long initial_overlap = 0;
     long target_overlap = 0;
     std::string category;
     if (target >= 0) {
-      const auto source =
-          std::as_const(*patterns).row(static_cast<std::size_t>(target));
+      const auto source = std::as_const(*patterns).row(static_cast<std::size_t>(target));
       initial_overlap = linalg::dot(source, input);
       target_overlap = linalg::dot(source, final_state);
-      total_initial_overlap +=
-          static_cast<double>(initial_overlap) / static_cast<double>(n);
+      total_initial_overlap += static_cast<double>(initial_overlap) / static_cast<double>(n);
       ++with_target;
-      total_target_overlap +=
-          static_cast<double>(target_overlap) / static_cast<double>(n);
+      total_target_overlap += static_cast<double>(target_overlap) / static_cast<double>(n);
       if (target_overlap == n_signed) {
         category = "target";
         ++recalled;
@@ -402,33 +408,30 @@ auto run(const Options &opts) -> int {
     total_steps += outcome.steps;
 
     auto overlap_text = [&](long m) {
-      return target >= 0 ? std::format("{}", static_cast<double>(m) /
-                                                 static_cast<double>(n))
+      return target >= 0 ? std::format("{}", static_cast<double>(m) / static_cast<double>(n))
                          : std::string{};
     };
     auto hamming_text = [&](long m) {
-      return target >= 0 ? std::format("{}", (n_signed - m) / 2)
-                         : std::string{};
+      return target >= 0 ? std::format("{}", (n_signed - m) / 2) : std::string{};
     };
-    *results_file << std::format(
-        "{},{},{},{},{},{},{},{},{},{},{},{},{}\n", q, target,
-        status_name(outcome.status), outcome.steps, category, best,
-        static_cast<double>(best_overlap) / static_cast<double>(n),
-        overlap_text(initial_overlap), hamming_text(initial_overlap),
-        overlap_text(target_overlap), hamming_text(target_overlap),
-        energy_initial, energy_final);
+    *results_file << std::format("{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n", q, target,
+                                 status_name(outcome.status), outcome.steps, category, best,
+                                 static_cast<double>(best_overlap) / static_cast<double>(n),
+                                 overlap_text(initial_overlap), hamming_text(initial_overlap),
+                                 overlap_text(target_overlap), hamming_text(target_overlap),
+                                 energy_initial, energy_final, nearest,
+                                 static_cast<double>(*nearest_it) / static_cast<double>(n),
+                                 reached_nearest ? 1 : 0);
   }
 
   const auto seconds =
-      std::chrono::duration<double>(std::chrono::steady_clock::now() - start)
-          .count();
+      std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
 
-  auto json_counts = [](const std::map<std::string, std::size_t> &counts) {
+  auto json_counts = [](const std::map<std::string, std::size_t>& counts) {
     std::string out = "{";
     bool first = true;
-    for (const auto &[name, count] : counts) {
-      out += std::format("{}{}: {}", first ? "" : ", ", io::json_string(name),
-                         count);
+    for (const auto& [name, count] : counts) {
+      out += std::format("{}{}: {}", first ? "" : ", ", io::json_string(name), count);
       first = false;
     }
     return out + "}";
@@ -439,54 +442,44 @@ auto run(const Options &opts) -> int {
     std::cerr << "error: " << summary_file.error() << '\n';
     return 1;
   }
-  *summary_file
-      << "{\n"
-      << std::format("  \"patterns\": {},\n",
-                     io::json_string(opts.patterns.string()))
-      << std::format(
-             "  \"queries\": {},\n",
-             io::json_string(opts.queries ? opts.queries->string() : ""))
-      << std::format("  \"rule\": {},\n", io::json_string(opts.rule))
-      << std::format("  \"mode\": {},\n", io::json_string(opts.mode))
-      << std::format("  \"width\": {},\n  \"height\": {},\n", opts.width,
-                     opts.height)
-      << std::format("  \"n_neurons\": {},\n  \"n_patterns\": {},\n", n,
-                     n_patterns)
-      << std::format("  \"stable_patterns\": {},\n", stable_patterns)
-      << std::format("  \"n_queries\": {},\n", n_queries)
-      << std::format("  \"queries_with_target\": {},\n", with_target)
-      << std::format("  \"recalled\": {},\n", recalled)
-      << std::format("  \"recall_rate\": {},\n",
-                     with_target > 0 ? static_cast<double>(recalled) /
-                                           static_cast<double>(with_target)
-                                     : 0.0)
-      << std::format("  \"mean_initial_target_overlap\": {},\n",
-                     with_target > 0 ? total_initial_overlap /
-                                           static_cast<double>(with_target)
-                                     : 0.0)
-      << std::format("  \"mean_target_overlap\": {},\n",
-                     with_target > 0 ? total_target_overlap /
-                                           static_cast<double>(with_target)
-                                     : 0.0)
-      << std::format("  \"mean_steps\": {},\n",
-                     static_cast<double>(total_steps) /
-                         static_cast<double>(n_queries))
-      << std::format("  \"categories\": {},\n", json_counts(categories))
-      << std::format("  \"statuses\": {},\n", json_counts(statuses))
-      << std::format("  \"max_steps\": {},\n  \"seed\": {},\n", opts.max_steps,
-                     opts.seed)
-      << std::format("  \"seconds\": {}\n", seconds) << "}\n";
+  *summary_file << "{\n"
+                << std::format("  \"patterns\": {},\n", io::json_string(opts.patterns.string()))
+                << std::format("  \"queries\": {},\n",
+                               io::json_string(opts.queries ? opts.queries->string() : ""))
+                << std::format("  \"rule\": {},\n", io::json_string(opts.rule))
+                << std::format("  \"mode\": {},\n", io::json_string(opts.mode))
+                << std::format("  \"train_seconds\": {},\n", train_seconds)
+                << std::format("  \"width\": {},\n  \"height\": {},\n", opts.width, opts.height)
+                << std::format("  \"n_neurons\": {},\n  \"n_patterns\": {},\n", n, n_patterns)
+                << std::format("  \"stable_patterns\": {},\n", stable_patterns)
+                << std::format("  \"n_queries\": {},\n", n_queries)
+                << std::format("  \"queries_with_target\": {},\n", with_target)
+                << std::format("  \"recalled\": {},\n", recalled)
+                << std::format("  \"recall_rate\": {},\n",
+                               with_target > 0 ? static_cast<double>(recalled) / static_cast<double>(with_target) : 0.0)
+                << std::format("  \"nearest_recalled\": {},\n", nearest_recalled)
+                << std::format("  \"nearest_recall_rate\": {},\n",
+                               static_cast<double>(nearest_recalled) / static_cast<double>(n_queries))
+                << std::format("  \"mean_initial_target_overlap\": {},\n",
+                               with_target > 0 ? total_initial_overlap / static_cast<double>(with_target) : 0.0)
+                << std::format("  \"mean_target_overlap\": {},\n",
+                               with_target > 0 ? total_target_overlap / static_cast<double>(with_target) : 0.0)
+                << std::format("  \"mean_steps\": {},\n",
+                               static_cast<double>(total_steps) / static_cast<double>(n_queries))
+                << std::format("  \"categories\": {},\n", json_counts(categories))
+                << std::format("  \"statuses\": {},\n", json_counts(statuses))
+                << std::format("  \"max_steps\": {},\n  \"seed\": {},\n", opts.max_steps, opts.seed)
+                << std::format("  \"seconds\": {}\n", seconds) << "}\n";
 
   std::cout << std::format("{}: {} {} stable {}/{} recalled {}/{} ({:.2f}s)\n",
-                           opts.out.string(), opts.rule, opts.mode,
-                           stable_patterns, n_patterns, recalled, with_target,
-                           seconds);
+                           opts.out.string(), opts.rule, opts.mode, stable_patterns, n_patterns,
+                           recalled, with_target, seconds);
   return 0;
 }
 
-} // namespace
+}
 
-auto main(int argc, char **argv) -> int {
+auto main(int argc, char** argv) -> int {
   auto opts = parse_args(argc, argv);
   if (!opts) {
     if (!opts.error().empty()) {
