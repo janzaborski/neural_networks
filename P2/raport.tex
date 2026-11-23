@@ -197,9 +197,6 @@ gdzie $\mathbf{C} = \frac{1}{n}\mathbf{I}_{N}$ (Hebb) lub $\mathbf{C} = (\mathbf
 a $\mathbf{D}$ to macierz przekątna zerująca przekątną $\mathbf{W}$.
 Sieć nie przechowuje więc macierzy $n \times n$, tylko wzorce $\mathbf{X}$, macierz $\mathbf{B} = \mathbf{X}\mathbf{C}$ ($n \times N$)
 i przekątną $\mathbf{D}$, a pola lokalne liczy jako $\mathbf{h} = \mathbf{B}(\mathbf{X}^{T}\mathbf{x}) - \mathbf{D}\mathbf{x}$.
-Daje to pamięć i koszt kroku $O(nN)$ zamiast $O(n^2)$, co dla obrazów $200 \times 300$ ($n = 60\,000$)
-oznacza kilka megabajtów zamiast kilkunastu gigabajtów.
-W trybie asynchronicznym wektor $\mathbf{X}^{T}\mathbf{x}$ jest aktualizowany po każdej zmianie stanu neuronu w czasie $O(N)$.
 Obliczenia wykonujemy w podwójnej precyzji, a $|h_i| \le 10^{-9}$ traktujemy jako $h_i = 0$,
 żeby błędy zaokrągleń nie rozstrzygały remisów.
 
@@ -211,7 +208,7 @@ Obliczenia wykonujemy w podwójnej precyzji, a $|h_i| \le 10^{-9}$ traktujemy ja
 Przebadano działanie sieci na 8 zbiorach dołączonych do zadania (rozdz.~\ref{sec:ds_animals}--\ref{sec:ds_small}),
 na zbiorach dużych obrazów utworzonych ze zbioru MPEG-7 (rozdz.~\ref{sec:ds_shapes})
 oraz na zbiorach wzorców losowych (rozdz.~\ref{sec:ds_capacity}).
-Zbiory przygotowane do konkretnych pytań z zadania opisujemy razem z wynikami (rozdz.~\ref{sec:wyniki}).
+Zbiory przygotowane do przebadania konkretnego zachowania sieci opisujemy razem z wynikami (rozdz.~\ref{sec:wyniki}).
 Każdy zbiór to bitmapy o ustalonym rozmiarze $W \times H$ (szerokość $\times$ wysokość),
 spłaszczone wierszami do wektorów stanów o długości $n = WH$;
 piksel czarny odpowiada stanowi $1$, biały stanowi $-1$.
@@ -228,18 +225,15 @@ Jako wzorce wejściowe do odtwarzania posłużyły zmodyfikowane wzorce z pamię
 \end{itemize}
 
 Każdy wzorzec zapamiętany był źródłem 4 zmodyfikowanych wejść dla każdego rodzaju i poziomu modyfikacji.
-Wszystkie wejścia generowano dla 5 ziaren generatora liczb losowych (0--4);
-to samo ziarno wyznacza też kolejność aktualizacji neuronów w trybie asynchronicznym.
-Odtwarzanie synchroniczne wzorców niezmienionych jest deterministyczne, więc wykonano je jednokrotnie.
+Wszystkie wejścia generowano dla 5 ziaren generatora liczb losowych (0--4),
+które podawano programowi do wyznaczenia kolejności aktualizacji neuronów w trybie asynchronicznym.
 
 Dla każdego wejścia zapisujemy stan końcowy i sprawdzamy, czy jest on
 \begin{itemize}
   \item \textbf{wzorcem źródłowym} -- wzorcem, z którego powstało wejście (\emph{dokładne odtworzenie});
   \item \textbf{wzorcem najbliższym wejściu} -- wzorcem lub negatywem wzorca o największym $|m_p(\mathbf{x})|$
         dla wejścia $\mathbf{x}$, czyli najmniejszej odległości Hamminga.
-        Przy wzorcach podobnych do siebie już niewielkie zmiany mogą przybliżyć wejście do innego wzorca niż źródłowy;
-        sieć, która wtedy kończy w tym innym wzorcu, działa poprawnie jako pamięć skojarzeniowa;
-  \item innym wzorcem, negatywem wzorca albo \textbf{stanem fałszywym} -- stanem stabilnym, który nie jest żadnym z nich.
+  \item innym wzorcem, negatywem wzorca albo \textbf{stanem fałszywym}, czyli stanem stabilnym, który nie jest żadnym z nich.
 \end{itemize}
 
 \subsubsection{Zbiór \texttt{animals}}
@@ -515,7 +509,7 @@ a dokładna stabilność wszystkich wymaga $N \lesssim n/(2\ln n)$~\cite{mceliec
 
 Rysunek~\ref{fig:hebb_overlap} pokazuje, że przy regule Hebba zbiory o mniejszym średnim podobieństwie
 mają więcej stabilnych wzorców.
-Dla wzorców skorelowanych składniki przesłuchu nie znoszą się, tylko sumują w kierunku części wspólnej wzorców,
+Dla wzorców skorelowanych składniki przesłuchu sumują się w kierunku części wspólnej wzorców,
 przez co minima energii przesuwają się do stanów fałszywych.
 W badanych obrazkach podobieństwo wynika głównie ze wspólnego tła,
 a wzorce o niezerowej średniej aktywności znacząco obniżają pojemność reguły Hebba~\cite{amit1987}.
@@ -733,7 +727,6 @@ znacznie powyżej pojemności dla wzorców losowych.
 Jest to możliwe, bo wzorce są dobrane tak, by były prawie ortogonalne.
 Pełnej ortogonalności nie da się osiągnąć: dla nieparzystego $n = 25$ iloczyn skalarny dwóch wektorów $\pm 1$ jest nieparzysty,
 więc $|m_{pq}| \ge 1/25$.
-Dla $n$ podzielnego przez 4 wiersze macierzy Hadamarda dają $n - 1$ wzorców stabilnych bez żadnego przesłuchu.
 
 Pseudoodwrotność zapewnia stabilność dowolnych wzorców liniowo niezależnych, czyli do $24$ wzorców,
 co potwierdza zbiór $24$ losowych wzorców (tab.~\ref{tab:stabilnosc}).
@@ -761,7 +754,7 @@ Maksymalizacja liczby stabilnych wzorców zmniejsza baseny przyciągania prawie 
 \subsection{Oscylacja w trybie synchronicznym}
 \label{sec:wyniki_oscylacja}
 
-Najprostszy przykład oscylacji otrzymujemy dla jednego wzorca $\boldsymbol{\xi}$ ($4 \times 4$, $n = 16$)
+Przykład oscylacji otrzymujemy dla jednego wzorca $\boldsymbol{\xi}$ ($4 \times 4$, $n = 16$)
 i wejścia $\mathbf{x}$ ortogonalnego do niego, tj.\ z połową pikseli odwróconą względem $\boldsymbol{\xi}$.
 Reguła Hebba daje wtedy $\mathbf{W} = \frac{1}{n}(\boldsymbol{\xi}\boldsymbol{\xi}^{T} - \mathbf{I})$, a pole lokalne
 \[
