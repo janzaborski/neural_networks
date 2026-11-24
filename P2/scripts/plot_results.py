@@ -1,23 +1,3 @@
-"""Aggregate all runs from out/ and plot them per dataset.
-
-  python scripts/plot_results.py
-
-Writes:
-  out/summary.csv                 one row per run (config + summary.json)
-  figures/stability.csv, .png     stable training patterns per dataset and rule
-  figures/<dataset>/recall_<kind>.png    kind = flip, mix:
-        fraction of damaged inputs that converged exactly to their source pattern
-        (median over seeds, band = min..max), one line per rule and mode
-  figures/<dataset>/overlap_flip.png     mean overlap of the final state with the source pattern
-  figures/<dataset>/steps_flip.png       mean number of steps (sync) / sweeps (async)
-  figures/<dataset>/recall_vs_distance_<rule>_<mode>.png
-        recall as a function of the measured Hamming distance between input and source pattern,
-        one line per kind of damage (all seeds and levels pooled, binned)
-  figures/<dataset>/outcomes_<kind>_<rule>_<mode>.png   where damaged inputs end up
-  figures/<dataset>/outcomes_random.png
-Outcome categories (from results.csv): target, target_inverse, other_pattern, other_inverse, spurious.
-"""
-
 import json
 import os
 
@@ -27,10 +7,10 @@ import pandas as pd
 from common import FIG_DIR, OUT_DIR, ROOT
 
 os.environ.setdefault("MPLCONFIGDIR", str(ROOT / ".cache" / "matplotlib"))
-import matplotlib  # noqa: E402
+import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+import matplotlib.pyplot as plt
 
 CATEGORIES = ["target", "target_inverse", "other_pattern", "other_inverse", "spurious"]
 CATEGORY_LABELS = {

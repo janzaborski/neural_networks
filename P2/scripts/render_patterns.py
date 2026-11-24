@@ -1,18 +1,3 @@
-"""Pictures of the pattern sets and of damaged inputs.
-
-  python scripts/render_patterns.py
-  python scripts/render_patterns.py --datasets small-7x7 --scale 20
-
-For every data/projekt2/<name>.csv writes into figures/<name>/:
-  patterns.png            all patterns side by side (with index)
-  patterns/pattern_XX.png every pattern as a plain bitmap (scaled, no axes)
-  noise_<kind>.png        pattern 0 damaged with every level of one kind (flip, mix)
-  noise_examples.png      one row per kind: pattern 0 and its damaged versions
-and figures/patterns.tex with two LaTeX figure blocks per dataset, patterns and damage examples
-(\\input it or copy the blocks).
-Convention: +1 = black, -1 = white.
-"""
-
 import argparse
 import math
 import os
@@ -22,13 +7,13 @@ import numpy as np
 from common import FIG_DIR, ROOT, Dataset, datasets
 
 os.environ.setdefault("MPLCONFIGDIR", str(ROOT / ".cache" / "matplotlib"))
-import matplotlib  # noqa: E402
+import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-from PIL import Image  # noqa: E402
+import matplotlib.pyplot as plt
+from PIL import Image
 
-import make_noise  # noqa: E402
+import make_noise
 
 
 def to_pixels(ds: Dataset, state: np.ndarray, scale: int) -> Image.Image:
@@ -162,9 +147,7 @@ def latex_blocks(ds: Dataset, n_patterns: int) -> str:
 
 
 def main():
-    p = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    p = argparse.ArgumentParser()
     p.add_argument("--datasets", nargs="*")
     p.add_argument(
         "--scale",

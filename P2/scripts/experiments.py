@@ -1,29 +1,3 @@
-"""Full experiment grid: every dataset x rule x mode x input set x seed.
-
-  cmake --preset release && cmake --build --preset release
-  python scripts/experiments.py --dry-run          # list what would run
-  python scripts/experiments.py                    # run everything missing (parallel)
-  python scripts/experiments.py --datasets small-7x7 --modes async --kinds flip --force
-
-Input sets ("kinds"):
-  patterns  the training patterns themselves (stability, no damage)
-  flip, mix, random
-            damaged / random inputs from make_noise.py (see its --help for the meaning of levels)
-Rules:
-  hebb           W = (X X^T - N I) / n
-  pseudoinverse  W = projection onto the span of the patterns, X (X^T X)^-1 X^T, zero diagonal
-Seeds 0..4 everywhere randomness is involved: the damage and the async update order.
-Synchronous retrieval of undamaged patterns is deterministic, so it runs with seed 0 only.
-Capacity sets (random patterns, capacity-*) run in async mode only.
-
-Every run writes out/<dataset>/<rule>/<mode>/<kind>_<level>/seed<seed>/:
-  config.json   the parameters below (written by this script)
-  summary.json, results.csv, stability.csv   (written by hopfield_app)
-  trajectory.csv  for seed 0 of selected sets (see TRAJECTORY_SETS)
-  weights.csv     for the undamaged sync run (one per dataset and rule, only if n <= MAX_WEIGHTS_N)
-All configs are also collected in configs/grid.json. Finished runs (summary.json present) are skipped.
-"""
-
 import argparse
 import json
 import os
@@ -154,9 +128,7 @@ def run_one(binary: list[str], cfg: dict) -> tuple[dict, str | None]:
 
 
 def main():
-    p = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    p = argparse.ArgumentParser()
     p.add_argument("--datasets", nargs="*")
     p.add_argument("--rules", nargs="*", choices=RULES, default=RULES)
     p.add_argument("--modes", nargs="*", choices=MODES, default=MODES)

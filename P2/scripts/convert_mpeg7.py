@@ -1,27 +1,3 @@
-"""Converts MPEG-7 CE-Shape-1 Part B silhouettes into +-1 bitmaps, one image per class.
-
-  python scripts/convert_mpeg7.py ~/Downloads/MPEG7dataset          # extracted archive (searched recursively)
-  python scripts/convert_mpeg7.py ~/Downloads/MPEG7dataset --sample 3 --width 200 --height 300
-
-Files are named <class>-<k>.gif (k = 1..20, sometimes -01); --sample picks k for every class.
-Each image is processed as follows:
-  1. binarised; the background is the value that dominates the image border
-     (MPEG-7 has white shapes on black, but this does not rely on it),
-  2. cropped to the bounding box of the shape,
-  3. rotated by 90 degrees if the shape is wider than tall and the target is taller than wide
-     (or vice versa), so that it fills more of the frame (--no-rotate disables it),
-  4. padded with background to the target aspect ratio, with a --margin around the shape,
-  5. resized (bilinear on 0/1, then threshold 0.5) to --width x --height.
-The shape is +1 (black in the figures), the background -1.
-
-Writes to data/mpeg7/ (not a dataset directory, so other scripts ignore it):
-  all-<W>x<H>.csv     one row per class, same format as the training sets
-  classes.csv         class, source file, foreground fraction, mean state, mean and max |m| to the other classes
-  overlaps.csv        |classes| x |classes| matrix of overlaps m = x . y / n
-and figures/mpeg7/catalog.png with all converted classes and their foreground fraction.
-Next step: scripts/select_shapes.py picks the training sets from this catalogue.
-"""
-
 import argparse
 import os
 import re
@@ -34,10 +10,10 @@ from PIL import Image
 from common import FIG_DIR, ROOT, save_states
 
 os.environ.setdefault("MPLCONFIGDIR", str(ROOT / ".cache" / "matplotlib"))
-import matplotlib  # noqa: E402
+import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+import matplotlib.pyplot as plt
 
 MPEG7_DIR = ROOT / "data" / "mpeg7"
 NAME = re.compile(r"^(?P<cls>.+)-(?P<k>\d+)\.gif$", re.IGNORECASE)
@@ -59,7 +35,6 @@ def find_files(src: Path, sample: int) -> dict[str, Path]:
 
 
 def binarise(path: Path) -> np.ndarray:
-    """True = shape."""
     img = np.asarray(Image.open(path).convert("L"), dtype=np.uint8) > 127
     border = np.concatenate([img[0], img[-1], img[:, 0], img[:, -1]])
     background = border.mean() > 0.5
@@ -116,9 +91,7 @@ def catalog_figure(
 
 
 def main():
-    p = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    p = argparse.ArgumentParser()
     p.add_argument("source", type=Path, help="directory with the extracted MPEG-7 GIFs")
     p.add_argument(
         "--sample",

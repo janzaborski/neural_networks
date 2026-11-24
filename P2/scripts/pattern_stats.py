@@ -1,21 +1,3 @@
-"""Correlations between the stored patterns of every dataset.
-
-  python scripts/pattern_stats.py
-  python scripts/pattern_stats.py --datasets letters-14x20 large-25x25
-
-The overlap of two patterns is m = (x . y) / n, between -1 (negatives) and 1 (identical).
-With the Hebb rule the local field of a stored pattern mu is
-    h = x_mu (1 - N/n) + sum_{nu != mu} x_nu * m(nu, mu),
-so large overlaps (crosstalk) make stored patterns unstable even far below the capacity 0.138 n.
-
-Writes:
-  figures/pattern_stats.csv   one row per dataset: N, n, load N/n, mean state,
-                              mean and max |m| over pairs of different patterns,
-                              number of patterns stable under the Hebb rule (computed here)
-  figures/pattern_stats.tex   the same as a LaTeX table (booktabs)
-  figures/<dataset>/overlaps.png   matrix of overlaps between all pairs of patterns
-"""
-
 import argparse
 import os
 
@@ -25,16 +7,13 @@ import pandas as pd
 from common import FIG_DIR, ROOT, Dataset, datasets
 
 os.environ.setdefault("MPLCONFIGDIR", str(ROOT / ".cache" / "matplotlib"))
-import matplotlib  # noqa: E402
+import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+import matplotlib.pyplot as plt
 
 
 def hebb_stable(patterns: np.ndarray) -> np.ndarray:
-    """True for every pattern that does not change in one update (ties keep the state).
-    W = (X^T X - N I) / n as in the C++ code, but W x_mu = (X^T (X x_mu) - N x_mu) / n
-    is computed without the n x n matrix (n = 60000 for 200x300 images)."""
     x = patterns.astype(np.int64)
     n_patterns, n = x.shape
     h = (x @ x.T) @ x - n_patterns * x
@@ -83,7 +62,6 @@ def overlap_plot(ds: Dataset):
 
 
 def num(value: float, spec: str) -> str:
-    """Number in math mode with a Polish decimal comma."""
     return "$" + format(value, spec).replace(".", "{,}") + "$"
 
 
@@ -117,9 +95,7 @@ def latex(table: pd.DataFrame) -> str:
 
 
 def main():
-    p = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    p = argparse.ArgumentParser()
     p.add_argument("--datasets", nargs="*")
     args = p.parse_args()
 

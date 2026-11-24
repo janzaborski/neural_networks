@@ -1,26 +1,3 @@
-"""Custom training sets for the questions about similar/diverse sets, the largest stable 5x5 set
-and a 2-state oscillation.
-
-  python scripts/make_custom.py
-  python scripts/make_custom.py --restarts 400 --seed 1
-
-Writes to data/custom/ (top-level CSVs are picked up as datasets by every other script):
-  letters-similar-14x20.csv   two groups of 3 mutually similar letters (from letters-14x20)
-  letters-diverse-14x20.csv   6 letters chosen to be as different from each other as possible
-  stable-hebb-5x5.csv         the largest 5x5 set found whose patterns are all strictly stable
-                              under the Hebb rule (h_i x_i > 0 for every neuron, no ties)
-  random12-5x5.csv,
-  random24-5x5.csv            random linearly independent 5x5 sets: a projection onto their span
-                              (the pseudoinverse rule) keeps every pattern stable
-                              up to N = n - 1 = 24
-  oscillation-4x4.csv         a single pattern xi
-  queries/oscillation-4x4.csv          an input x with xi . x = 0 (8 of 16 pixels inverted);
-  queries/oscillation-4x4.targets.csv  then h = W x = -x / n, so synchronous updates give x -> -x -> x
-  custom.json                 how the sets were chosen (letters, overlaps, search results)
-
-Stability is checked here with the same Hebb weights as the C++ code: W = (X^T X - N I) / n.
-"""
-
 import argparse
 import json
 
@@ -38,8 +15,6 @@ def overlaps(x: np.ndarray) -> np.ndarray:
 
 
 def hebb_margins(x: np.ndarray) -> np.ndarray:
-    """h_i * x_i for every pattern and neuron; > 0 means strictly stable.
-    Computed in integers (n * W) so that ties are exactly 0."""
     xi = x.astype(np.int64)
     n_patterns, n = xi.shape
     nw = xi.T @ xi - n_patterns * np.eye(n, dtype=np.int64)
@@ -47,7 +22,6 @@ def hebb_margins(x: np.ndarray) -> np.ndarray:
 
 
 def projection_margins(x: np.ndarray) -> np.ndarray:
-    """The same for W = projection onto span(X) with zero diagonal (the pseudoinverse rule)."""
     xf = x.astype(np.float64)
     p = xf.T @ np.linalg.pinv(xf.T)
     np.fill_diagonal(p, 0.0)
@@ -59,8 +33,6 @@ def letter_names(idx) -> str:
 
 
 def similar_groups(m: np.ndarray, n_groups: int, size: int) -> list[list[int]]:
-    """Greedy: each group starts from the most similar free pair and grows by the letter
-    with the largest mean |m| to the group."""
     a = np.abs(m.copy())
     np.fill_diagonal(a, -np.inf)
     free = set(range(len(m)))
@@ -79,7 +51,6 @@ def similar_groups(m: np.ndarray, n_groups: int, size: int) -> list[list[int]]:
 
 
 def diverse_set(m: np.ndarray, size: int) -> list[int]:
-    """Greedy: start from the least similar pair, add the letter whose largest |m| to the set is smallest."""
     a = np.abs(m.copy())
     np.fill_diagonal(a, np.inf)
     i, j = np.unravel_index(np.argmin(a), a.shape)
@@ -111,7 +82,6 @@ def letters(meta: dict):
 
 
 def valid_set(x: np.ndarray) -> bool:
-    """No duplicates and no pattern together with its negative (those cancel in W)."""
     m = np.abs(x.astype(np.int64) @ x.T.astype(np.int64))
     np.fill_diagonal(m, 0)
     return bool((m < x.shape[1]).all())
@@ -120,7 +90,6 @@ def valid_set(x: np.ndarray) -> bool:
 def find_stable(
     n_patterns: int, n: int, rng: np.random.Generator, sweeps: int
 ) -> np.ndarray | None:
-    """Local search over the pixels of N patterns minimising the number of non-stable neurons."""
     x = rng.choice(np.array([-1, 1], dtype=np.int8), size=(n_patterns, n))
 
     def cost(s):
@@ -203,9 +172,7 @@ def oscillation(meta: dict, rng: np.random.Generator):
 
 
 def main():
-    p = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    p = argparse.ArgumentParser()
     p.add_argument("--seed", type=int, default=0)
     p.add_argument(
         "--restarts",

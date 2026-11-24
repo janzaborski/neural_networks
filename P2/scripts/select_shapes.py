@@ -1,23 +1,3 @@
-"""Training sets of MPEG-7 shapes (one image per class) chosen from the catalogue of convert_mpeg7.py.
-
-  python scripts/select_shapes.py                          # nested sets of 5, 10 and 20 classes
-  python scripts/select_shapes.py --sizes 4 8 16 32 --min-foreground 0.3
-  python scripts/select_shapes.py --classes apple bat bell heart key --name shapes-mine
-
-Automatic choice (greedy, so the sets are nested: the 5 classes are the first 5 of the 10):
-  - only classes with foreground fraction in [--min-foreground, --max-foreground]
-    (balanced images have smaller overlaps: two unrelated images with foreground f
-    still agree on the shared background, roughly m ~ (1 - 2f)^2),
-  - start from the pair with the smallest |m|,
-  - add the class whose largest |m| to the classes already chosen is the smallest
-    (--criterion mean: the smallest mean |m| instead).
-
-Writes data/custom/<name><N>-<W>x<H>.csv (picked up as a dataset by the other scripts) and
-data/custom/<name>.json with the classes and statistics of every set: mean and max |m|,
-the number of patterns stable under the Hebb rule, and the condition number of the Gram
-matrix X X^T / n (large = nearly linearly dependent patterns, numerically sensitive pseudoinverse).
-"""
-
 import argparse
 import json
 import re
@@ -30,7 +10,6 @@ from convert_mpeg7 import MPEG7_DIR
 
 
 def hebb_stable(x: np.ndarray) -> int:
-    """W x_mu = (X^T X x_mu - N x_mu) / n, computed without the n x n matrix."""
     xf = x.astype(np.float64)
     n_patterns, n = xf.shape
     h = ((xf @ xf.T) @ xf - n_patterns * xf) / n
@@ -70,9 +49,7 @@ def greedy(m: np.ndarray, eligible: list[int], size: int, criterion: str) -> lis
 
 
 def main():
-    p = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    p = argparse.ArgumentParser()
     p.add_argument(
         "--shape",
         default=None,

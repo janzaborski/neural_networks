@@ -1,22 +1,3 @@
-"""Damaged and random inputs ("queries") for retrieval experiments.
-
-  python scripts/make_noise.py                       # all datasets, all kinds, seeds 0..4
-  python scripts/make_noise.py --datasets small-7x7 --kinds flip mix --seeds 3
-
-For every dataset, kind, level and seed it writes
-  data/queries/<dataset>/<kind>_<level>_seed<seed>.csv          queries, same format as the patterns
-  data/queries/<dataset>/<kind>_<level>_seed<seed>.targets.csv  index of the source pattern per line (-1 = none)
-
-Kinds (level meaning in brackets):
-  flip    exactly round(level * n) randomly chosen pixels are inverted        [fraction of pixels]
-  mix     every pixel comes from the source pattern with probability `level`,
-          otherwise from another, randomly chosen pattern; target = source    [probability]
-  random  uniformly random states, target -1                                  [-]
-Every pattern gets --per-pattern damaged copies. Output is deterministic for a given seed.
-Only random changes are used, so the results do not depend on where the pixels lie in the image
-(the network does not use pixel neighbourhood anyway). Capacity sets (capacity-*) get flip only.
-"""
-
 import argparse
 import zlib
 
@@ -79,7 +60,6 @@ def damage(
 
 
 def applicable(kind: str, n_patterns: int, name: str = "") -> bool:
-    """A mixture needs at least two patterns; capacity sets are only probed with flips."""
     if is_capacity(name):
         return kind == "flip"
     return kind != "mix" or n_patterns >= 2
@@ -117,7 +97,6 @@ def ensure(
     per_pattern: int = PER_PATTERN,
     force: bool = False,
 ):
-    """Create the query files if missing; returns (queries, targets) paths."""
     q_path, t_path = paths(ds, kind, level, seed)
     if force or not (q_path.exists() and t_path.exists()):
         queries, targets = generate(ds, kind, level, seed, per_pattern)
@@ -127,9 +106,7 @@ def ensure(
 
 
 def main():
-    p = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    p = argparse.ArgumentParser()
     p.add_argument("--datasets", nargs="*")
     p.add_argument("--kinds", nargs="*", choices=list(KINDS), default=list(KINDS))
     p.add_argument(

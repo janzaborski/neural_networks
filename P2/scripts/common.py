@@ -1,5 +1,3 @@
-"""Shared paths and helpers for the Hopfield experiment scripts."""
-
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -37,7 +35,6 @@ class Dataset:
 
 
 def dataset_from_path(path: Path) -> Dataset:
-    """Shape is read from the file name: WxH = width x height (e.g. letters-abc-8x12 = 8 columns, 12 rows)."""
     name = path.name.removesuffix(".csv")
     match = SHAPE.search(name)
     if match is None:
@@ -67,7 +64,6 @@ def save_states(path: Path, states: np.ndarray) -> None:
 
 
 def decode_state(encoded: str) -> np.ndarray:
-    """trajectory.csv stores a state as a string of 0/1 (1 = +1)."""
     return np.frombuffer(encoded.encode(), dtype=np.uint8).astype(np.int8) * 2 - 97
 
 
@@ -76,5 +72,4 @@ def level_tag(level: float) -> str:
 
 
 def is_capacity(name: str) -> bool:
-    """Sets of random patterns used to compare stability and recall with theory."""
     return name.startswith("capacity-")

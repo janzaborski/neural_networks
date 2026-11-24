@@ -1,27 +1,3 @@
-"""Figures and tables for the results section of the report, from out/summary.csv.
-
-  python scripts/plot_results.py      # first: collects out/ into out/summary.csv
-  python scripts/report_figures.py
-
-Needs out/summary.csv and figures/pattern_stats.csv (scripts/pattern_stats.py).
-Writes figures/report/:
-  stability.tex                     stable patterns per dataset and rule (LaTeX table)
-  hebb_stability_vs_overlap.png     Hebb: fraction of stable patterns vs mean |m|
-  recall_flip_<rule>.png            recall vs flipped pixels, one line per given dataset
-  nearest_flip_<rule>.png           the same, but counting the pattern nearest to the input as success
-  overlap_flip_hebb.png             Hebb: overlap of the final state with the source pattern
-  mix_<rule>.png                    pixel mixtures: ending in the source / in another pattern vs share q
-  cycles_sync.png                   share of synchronous retrievals ending in a 2-cycle
-  large_25x25_vs_25x50.png          recall vs flipped pixels for both large sets and both rules
-  similar_vs_diverse.png            pseudoinverse: similar vs diverse letters (flip, mix)
-  random_outcomes.png               where random inputs end up, per dataset and rule
-  stable_5x5.png                    recall of the custom 5x5 sets vs number of flipped pixels
-  shapes.png                        MPEG-7 sets: recall vs flipped pixels and pixel mixtures
-  capacity_stability.png            random patterns: stable fraction vs load N/n, with the theory for Hebb
-  capacity_recall.png               random patterns: recall from 10% / 20% flipped pixels vs load N/n
-Async retrieval unless stated otherwise; values are means over the 5 seeds.
-"""
-
 import math
 import os
 
@@ -31,10 +7,10 @@ import pandas as pd
 from common import FIG_DIR, OUT_DIR, ROOT, is_capacity
 
 os.environ.setdefault("MPLCONFIGDIR", str(ROOT / ".cache" / "matplotlib"))
-import matplotlib  # noqa: E402
+import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+import matplotlib.pyplot as plt
 
 OUT = FIG_DIR / "report"
 SERIES = [
@@ -421,10 +397,6 @@ def mix_plot(df, rule):
 
 
 def hebb_stable_theory(load, n):
-    """Expected fraction of stable patterns. Without the self-coupling the field of neuron i of a
-    stored pattern is x_i (n - 1) / n plus the crosstalk of the N - 1 other patterns over the
-    remaining n - 1 neurons, approximately normal with variance (N - 1)(n - 1) / n^2.
-    Neurons are treated as independent, so the pattern is stable with probability (1 - p)^n."""
     n_patterns = load * n
     if n_patterns <= 1:
         return 1.0
