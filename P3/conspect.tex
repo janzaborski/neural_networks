@@ -1,0 +1,150 @@
+\documentclass{article}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\setlength{\emergencystretch}{1em}
+\usepackage[polish]{babel}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{enumitem}
+\setlist{itemsep=2pt, topsep=4pt}
+
+\title{Prognoza pogody perceptronem wielowarstwowym\\ \large Konspekt projektu}
+\author{Hubert Błonowski \and Jan Zaborski}
+\date{}
+
+\newlist{badania}{enumerate}{1}
+\setlist[badania]{label=\thesubsection.\arabic*., leftmargin=*, align=left}
+\newlist{punkty}{enumerate}{1}
+\setlist[punkty]{label=\thesection.\arabic*., leftmargin=*, align=left}
+
+\begin{document}
+
+\maketitle
+
+\section*{Zadanie i dane}
+Korzystamy ze zbioru Historical Hourly Weather Data (Kaggle): pomiary godzinowe z 36 miast
+(30 z USA i Kanady, 6 z Izraela) od października 2012 do listopada 2017.
+Na podstawie dni $D_{t-3}, D_{t-2}, D_{t-1}$ przewidujemy dzień $D_{t+1}$, pomijając dzień $D_t$ (okno \texttt{I I I X O}).
+Sieć ma dwa wyjścia:
+\begin{itemize}
+  \item średnią temperaturę dnia $D_{t+1}$ (trafienie, gdy błąd $\le 2\,^\circ$C),
+  \item wystąpienie silnego wiatru, czyli prędkości $\ge 6$~m/s (ocena przez AUC).
+\end{itemize}
+
+Dane dzielimy chronologicznie: uczenie do końca 2015 roku, walidacja 2016, test 2017.
+Między zbiorami zostawiamy przerwę długości okna, żeby żadne okno nie obejmowało dni z dwóch zbiorów.
+Statystyki normalizacji liczymy wyłącznie na zbiorze uczącym.
+Model jest perceptronem wielowarstwowym rozwijanym na bazie biblioteki z projektu~1;
+przepływ sygnału składamy ręcznie z warstw liniowych i funkcji aktywacji.
+
+\section{Badania}
+
+\subsection{Architektura}
+\begin{badania}
+  \item Liczba warstw ukrytych i neuronów w warstwach.
+  \item Funkcje aktywacji: ReLU, tanh, sigmoid.
+  \item Różne aktywacje w kolejnych warstwach a jedna funkcja dla całej sieci.
+  \item Warianty podwójnego wyjścia:
+    \begin{itemize}
+      \item wspólny tułów i dwie głowy (wspólne warstwy ukryte),
+      \item dwie osobne sieci (bez współdzielenia wag),
+      \item częściowe współdzielenie (wspólna tylko pierwsza warstwa),
+      \item waga $\lambda$ w koszcie $L = L_\text{temp} + \lambda L_\text{wiatr}$ (balans dwóch zadań).
+    \end{itemize}
+  \item Kodowanie wyjść:
+    \begin{itemize}
+      \item temperatura jako wartość standaryzowana lub zmiana względem $D_{t-1}$,
+      \item wiatr jako prawdopodobieństwo (sigmoid) lub regresja prędkości z progiem 6~m/s.
+    \end{itemize}
+\end{badania}
+
+\subsection{Uczenie}
+\begin{badania}
+  \item Optymalizatory: SGD, SGD z momentum, Adam.
+  \item Funkcje kosztu: MSE, MAE i Huber dla temperatury, BCE dla wiatru.
+    Ocena modeli osobnymi metrykami:
+    \begin{itemize}
+      \item temperatura: odsetek trafień ($|\text{błąd}| \le 2\,^\circ$C), MAE, RMSE,
+      \item wiatr: AUC, dodatkowo czułość i precyzja przy wybranym progu.
+    \end{itemize}
+\end{badania}
+
+\subsection{Inicjalizacja}
+\begin{badania}
+  \item Inicjalizacja He i Xavier a rozkład jednostajny o stałym zakresie.
+\end{badania}
+
+\subsection{Dane}
+\begin{badania}
+  \item Kodowanie wejść:
+    \begin{itemize}
+      \item agregaty dobowe (średnia, minimum, maksimum) lub bardziej szczegółowe (dzień i noc osobno),
+      \item normalizacja globalna lub osobno dla każdego miasta, standaryzacja,
+      \item miasto: one-hot lub położenie na sferze jednostkowej
+        $(\cos\varphi\cos\lambda,\ \cos\varphi\sin\lambda,\ \sin\varphi)$,
+      \item dzień roku jako $(\sin, \cos)$; godzina jako $(\sin, \cos)$ tylko w wariantach bez agregacji dobowej,
+      \item opis pogody: one-hot grup lub udział godzin z danym typem pogody w ciągu dnia,
+      \item kierunek wiatru jako $(\sin, \cos)$.
+    \end{itemize}
+  \item Agregacja okna: spłaszczenie trzech dni, statystyki okna (średnia, trend),
+    bloki dni o wspólnych wagach (ten sam koder dla każdego dnia, wyniki łączone).
+  \item Braki danych: interpolacja krótkich luk, uzupełnianie średnią, odrzucanie okien z brakami.
+  \item Wybór cech przez ablację: usuwamy po jednej grupie cech i mierzymy spadek jakości na zbiorze walidacyjnym.
+\end{badania}
+
+\subsection{Pozostałe}
+\begin{badania}
+  \item Predykcja pośrednia dnia $D_t$: pierwsza sieć przewiduje $D_t$, druga przewiduje $D_{t+1}$
+    na podstawie okna i przewidzianego $D_t$. Drugą sieć uczymy na przewidzianym, a nie prawdziwym $D_t$.
+  \item Dobór hiperparametrów: badania 1.1--1.4 zmieniają jeden czynnik względem konfiguracji bazowej;
+    konfigurację końcową wybieramy losowym przeszukiwaniem (random search) najważniejszych parametrów na zbiorze walidacyjnym.
+    Zbiór testowy oceniamy raz, na końcu.
+  \item Porównanie z metodami klasycznymi:
+    \begin{itemize}
+      \item persystencja (prognoza równa ostatniemu znanemu dniowi),
+      \item klimatologia (średnia dla danego dnia roku i miasta),
+      \item regresja liniowa dla temperatury i logistyczna dla wiatru na tych samych cechach.
+    \end{itemize}
+\end{badania}
+
+\section{Implementacja}
+\begin{punkty}
+  \item Skrypty danych w Pythonie: wczytanie, agregaty, braki danych, kodowania, okna, podział chronologiczny.
+  \item Funkcja aktywacji wybierana osobno dla każdej warstwy.
+  \item Podwójna warstwa wyjściowa: dwie głowy i suma kosztów z wagą $\lambda$.
+  \item Optymalizatory: SGD z momentum i Adam.
+  \item Nowe funkcje kosztu: MAE, Huber, BCE z opcjonalną wagą klasy (silny wiatr może być rzadki).
+  \item Metryki oceny: odsetek trafień, MAE, RMSE, AUC.
+  \item Inicjalizacja He i Xavier.
+  \item Wczesne zatrzymanie na podstawie kosztu walidacyjnego.
+  \item Bloki dni o wspólnych wagach (gradient wspólnego kodera jest sumą gradientów z trzech dni).
+  \item Predykcja pośrednia (dwie sieci uczone kolejno).
+  \item Zewnętrzny skrypt losowego przeszukiwania hiperparametrów.
+  \item Rozszerzenie zapisu konfiguracji z projektu~1 o nowe parametry (wersja, ziarno, podział, parametry).
+  \item Opcjonalnie: SIMD w obliczeniach macierzowych, biblioteka Rust wywoływana z Pythona.
+\end{punkty}
+
+\section{Hipotezy}
+\begin{punkty}
+  \item Najlepiej sprawdzą się 2 warstwy ukryte (na podstawie doświadczeń z projektu~1).
+  \item Wystarczy około 64 neuronów w warstwie.
+  \item Różne aktywacje w kolejnych warstwach nie poprawią wyników względem jednej funkcji.
+  \item Adam zbiega szybciej niż SGD, ale końcowa jakość jest podobna.
+  \item Inicjalizacje He i Xavier dają lepsze i stabilniejsze uczenie niż rozkład jednostajny.
+  \item Huber i MAE dają wyższy odsetek trafień ($\le 2\,^\circ$C), MSE niższe RMSE.
+  \item Kodowanie wejść:
+    \begin{itemize}
+      \item normalizacja osobno dla każdego miasta jest lepsza od globalnej,
+      \item położenie na sferze działa co najmniej tak dobrze jak one-hot miasta przy mniejszej liczbie wejść,
+      \item minimum, maksimum i trend dają lepsze wyniki niż same średnie,
+      \item cykliczne kodowanie dnia roku poprawia przede wszystkim prognozę temperatury.
+    \end{itemize}
+  \item Bloki dni o wspólnych wagach są co najmniej tak dobre jak spłaszczenie okna przy mniejszej liczbie parametrów.
+  \item Ablacja pokaże, że najważniejsze są temperatury z poprzednich dni i dzień roku, a opis pogody i kierunek wiatru wnoszą niewiele.
+  \item Predykcja pośrednia dnia $D_t$ nie poprawia prognozy $D_{t+1}$.
+  \item MLP jest lepszy od persystencji i klimatologii oraz nieznacznie lepszy od regresji liniowej i logistycznej.
+\end{punkty}
+
+\end{document}

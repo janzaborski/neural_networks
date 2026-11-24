@@ -1,0 +1,47 @@
+# Rust
+/target/
+**/*.rs.bk
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+*.egg-info/
+
+# Dane i wyniki
+/data/raw/
+/data/processed/
+/results/
+/runs/
+*.npz
+*.npy
+*.parquet
+
+# LaTeX
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+*.nav
+*.snm
+*.vrb
+*.xdv
+_minted*/
+
+# Edytor i system
+*.swp
+*~
+.DS_Store
+.idea/
+.vscode/
